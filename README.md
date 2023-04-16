@@ -1,29 +1,31 @@
 # Connext Galxe Dashboard
 The script to automatically fetch Connext Liquidity transaction for it's [Liquidity Bootstraping Campaign](https://blog.connext.network/providing-liquidity-on-connext-f7aa3f2bc7b8). The
 
-## Table of Content
-- [Table of Content](#table-of-content)
-- [Introduction](#introduction)
-- [Architecture](#architecture)
-- [Prerequisite](#prerequisite)
-- [Setting up CloudWatch Event](#setting-up-cloudwatch-event)
-- [Setting up RDS](#setting-up-rds)
-- [Setting up SQS](#setting-up-sqs)
-- [Usage](#usage)
-- [1. Setup AWS CLI](#1-setup-aws-cli)
-    - [1.1 Installation](#11-installation)
-    - [1.2 Authrization](#12-authrization)
-- [2. Create docker repository](#2-create-docker-repository)
-- [3. Prepare docker image](#3-prepare-docker-image)
-    - [3.1 Docker login with AWS](#31-docker-login-with-aws)
-    - [3.1 Build a dockerfile](#31-build-a-dockerfile)
-    - [3.2 Tag docker](#32-tag-docker)
-    - [3.3 Push a docker](#33-push-a-docker)
-- [4. Create a function](#4-create-a-function)
-    - [4.1 Create an execution role](#41-create-an-execution-role)
-    - [4.2 Create Lambda Function](#42-create-lambda-function)
-- [5. Configure Environment variables](#5-configure-environment-variables)
-
+## Table of Contents
+  - [Architecture](#architecture)
+  - [Prerequisite](#prerequisite)
+    - [Setting up CloudWatch Event](#setting-up-cloudwatch-event)
+    - [Setting up RDS](#setting-up-rds)
+    - [Setting up SQS](#setting-up-sqs)
+    - [Setting up Lambda function that attached with CloudWatch Event](#setting-up-lambda-function-that-attached-with-cloudwatch-event)
+  - [Usage](#usage)
+    - [1. Setup AWS CLI](#1-setup-aws-cli)
+      - [1.1 Installation](#11-installation)
+      - [1.2 Authrization](#12-authrization)
+    - [2. Create docker repository](#2-create-docker-repository)
+    - [3. Prepare docker image](#3-prepare-docker-image)
+      - [3.1 Docker login with AWS](#31-docker-login-with-aws)
+      - [3.2 Build a dockerfile](#32-build-a-dockerfile)
+      - [3.3 Tag docker](#33-tag-docker)
+      - [3.4 Push docker image to AWS ECR](#33-push-docker-image-to-aws-ecr)
+    - [4. Create a function](#4-create-a-function)
+      - [4.1 Create an execution role](#41-create-an-execution-role)
+      - [4.2 Create Lambda Function](#42-create-lambda-function)
+    - [5. Configure Environment variables](#5-configure-environment-variables)
+    - [6. Configure trigger](#6-configure-trigger)
+  - [Fetching historical data](#fetching-historical-data)
+  - [Notes](#notes)
+  - [Authors](#authors)
 
 ## Architecture
 For the cloud provider, we utilize AWS as it is the most popular cloud provider in the world. The architecture design is as follow:
@@ -125,21 +127,21 @@ aws ecr get-login-password --region <region> | docker login --username AWS --pas
 ```
 Note that you need to specify the `region` and `aws-id` in the command above.
 
-#### 3.1 Build a dockerfile
+#### 3.2 Build a dockerfile
 Then, you need to build a docker image. To do so, follow the instruction below:
 ```sh
 docker build --platform=linux/amd64 -t <container-name> -f transactions.dockerfile .
 ```
 Also, you need to specify the `container-name` in the command above. If you want to build the docker image for the transfers, you can use the `transfers.dockerfile` instead.
 
-#### 3.2 Tag docker
+#### 3.3 Tag docker
 After building the docker image, you need to tag it. To do so, follow the instruction below:
 ```sh
 docker tag <container-name>:latest <repository-url>:latest
 ```
 Remember to specify the `container-name` and `repository-url` in the command above.
 
-#### 3.3 Push a docker
+#### 3.4 Push a docker image to AWS ECR
 Finally, you need to push the docker image to the repository. To do so, follow the instruction below:
 ```sh
 docker push <repository-url>:latest
