@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from src.process_queue import process_transfers
+from src.utils import print_log
 
 
 def lambda_handler(event, context):
@@ -20,15 +21,15 @@ def lambda_handler(event, context):
         "%Y-%m-%dT%H:%M:%S"
     )
     
-    print(f"Message: {message_id}")
-    print(f"Start: {start_datetime}")
-    print(f"End: {end_datetime}")
-    print(f"Chain: {chain}")
+    print_log(f"Message: {message_id}")
+    print_log(f"Start: {start_datetime}")
+    print_log(f"End: {end_datetime}")
+    print_log(f"Chain: {chain}")
 
     try:
         process_transfers(record)
     except Exception as e:
-        print(e)
+        print_log(e)
         raise e
 
     return {

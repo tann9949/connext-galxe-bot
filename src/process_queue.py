@@ -96,7 +96,7 @@ def insert_transactions(
     fetched_items: list, 
     table_name: str,
 ) -> None:
-    print(f"Adding {len(fetched_items)} items to mysql db")
+    print(f"[+] Adding {len(fetched_items)} items to mysql db")
     cnx = pymysql.connect(
         host=os.getenv("AWS_RDS_HOSTNAME"),
         user=os.getenv("AWS_RDS_USERNAME"),
@@ -106,7 +106,7 @@ def insert_transactions(
     # add to mysql db
     for item in fetched_items:
         with cnx.cursor() as cursor:
-            print_log(f"Adding {item} to mysql db")
+            print_log(f"[-] Adding {item} to mysql db")
             query = (
                 f"INSERT INTO {table_name} "
                 "(timestamp, chain, hash, user_address, token_address, token_amount, action) "
@@ -114,7 +114,7 @@ def insert_transactions(
             )
             cursor.execute(query, item)
             cnx.commit()
-            print_log(cursor.rowcount, "record inserted.")
+            print_log(f"[-] {cursor.rowcount} record inserted.")
 
 
 def process_transaction(
@@ -123,15 +123,20 @@ def process_transaction(
     """
     Process a transaction record from AWS SQS
     """
+    print_log("[+] Processing transaction record")
     chain = int(record.get("chain"))
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
     end_datetime = record.get("end_datetime")
+    print_log(f"[-] Chain: {Chain.resolve_connext_domain(chain)}")
+    print_log(f"[-] Time fetch: {start_datetime} -> {end_datetime}")
+    print_log(f"[-] Table: {table_name}")
     if not chain:
         raise Exception("Chain not found in queue record")
     scan_api = ScanAPI(chain, apikey_schedule="random")
     
     start_block, end_block = get_block_range(chain, start_datetime, end_datetime)
+    print_log(f"[-] Block fetch: {start_block} -> {end_block}")
     txs = scan_api.get_transaction_by_address(
         DiamondContract.get_contract_address(chain),
         startblock=start_block,
@@ -140,13 +145,14 @@ def process_transaction(
 
     fetched_items = []
     # iterate over all transactions
+    print(f"[+] Processing {len(txs)} transactions from ConnextDiamond contract")
     for tx in txs:
         try:
             # filter non-liquidity txs
             tx_error = bool(tx.isError)
             tx_function = tx.functionName.split("(")[0]
             if tx_error or tx_function not in FUNCTIONS:
-                print_log(f"Skipping {tx_function} transaction {tx.hash}")
+                print_log(f"[-] Skipping {tx_function} transaction {tx.hash}")
                 continue
 
             # skip if transaction already have receipt
@@ -154,13 +160,13 @@ def process_transaction(
                 continue
 
             # resolve tx receipt
-            print_log(f"Resolving transaction {tx.hash}")
+            print_log(f"[-] Resolving transaction {tx.hash}")
             receipt = scan_api.get_transaction_receipt(
                 tx.hash, max_attempt=10, wait_time=1)
             
             # skip if receipt is not available
             if isinstance(receipt, str):
-                print_log(f"Error: {receipt}")
+                print_log(f"[+] Error: {receipt}")
                 continue
 
             # iterate over all logs
@@ -177,7 +183,7 @@ def process_transaction(
 
                 # filter unwanted topic
                 if topic_name not in TOPICS:
-                    print_log(f"Skipping {topic_name} topic")
+                    print_log(f"[-] Skipping {topic_name} topic")
                     continue
 
                 # skip unwanted address
@@ -216,7 +222,7 @@ def process_transaction(
 
         # catch any error, add to error list
         except Exception as e:
-            print_log(f"Error occured for tx: {tx.hash}")
+            print_log(f"[+] Error occured for tx: {tx.hash}")
             print_log(e)
             continue
 
@@ -231,13 +237,19 @@ def process_transfers(
     """
     Process a transaction record from AWS SQS
     """
+    print_log("[+] Processing transfers record")
     chain = record.get("chain")
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
     end_datetime = record.get("end_datetime")
+    print_log(f"[-] Chain: {Chain.resolve_connext_domain(chain)}")
+    print_log(f"[-] Time fetch: {start_datetime} -> {end_datetime}")
+    print_log(f"[-] Table: {table_name}")
     if not chain:
         raise Exception("Chain not found in queue record")
     start_block, end_block = get_block_range(chain, start_datetime, end_datetime)
+    print_log(f"[-] Block fetch: {start_block} -> {end_block}")
+
     transfer_txs = []
     scan_api = ScanAPI(chain, apikey_schedule="random")
     for token in [Token.USDC, Token.WETH]:
@@ -249,23 +261,24 @@ def process_transfers(
                 endblock=end_block,))
 
     fetched_items = []
+    print(f"[+] Processing {len(transfer_txs)} transactions from ConnextDiamond contract")
     # iterate over all transactions
     for tx in transfer_txs:
         try:
             # filter non-liquidity txs
             tx_error = bool(tx.isError)
             if tx_error:
-                print_log(f"Skipping transaction {tx.hash}")
+                print_log(f"[-] Skipping transfers transaction {tx.hash}")
                 continue
 
             # resolve tx receipt
-            print_log(f"Resolving transaction {tx.hash}")
+            print_log(f"[-] Resolving transaction {tx.hash}")
             receipt = scan_api.get_transaction_receipt(
                 tx.hash, max_attempt=10, wait_time=1)
             
             # skip if receipt is not available
             if isinstance(receipt, str):
-                print_log(f"Error: {receipt}")
+                print_log(f"[+] Error: {receipt}")
                 continue
 
             # iterate over all logs
@@ -320,10 +333,10 @@ def process_transfers(
 
         # catch any error, add to error list
         except Exception as e:
-            print_log(f"Error occured for tx: {tx.hash}")
+            print_log(f"[+] Error occured for tx: {tx.hash}")
             print_log(e)
             continue
 
-    insert_transactions(fetched_items, table_name, )
+    insert_transactions(fetched_items, table_name)
 
     return fetched_items

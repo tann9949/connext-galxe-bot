@@ -2,9 +2,11 @@ import json
 from datetime import datetime
 
 from src.process_queue import process_transaction
+from src.utils import print_log
 
 
 def lambda_handler(event, context):
+    print_log(f"[+] Transaction Lambda Called")
     queue_records = event.get("Records")
     assert len(queue_records) == 1
     record = json.loads(queue_records[0]["body"])
@@ -20,15 +22,15 @@ def lambda_handler(event, context):
         "%Y-%m-%dT%H:%M:%S"
     )
     
-    print(f"Message: {message_id}")
-    print(f"Start: {start_datetime}")
-    print(f"End: {end_datetime}")
-    print(f"Chain: {chain}")
+    print_log(f"[-] Message: {message_id}")
+    print_log(f"[-] Start: {start_datetime}")
+    print_log(f"[-] End: {end_datetime}")
+    print_log(f"[-] Chain: {chain}")
 
     try:
         process_transaction(record)
     except Exception as e:
-        print(e)
+        print_log(e)
         raise e
 
     return {
