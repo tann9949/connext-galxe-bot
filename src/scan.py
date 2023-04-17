@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 import random
 import time
@@ -8,7 +7,7 @@ from typing import Dict, List, Union, Optional
 
 import requests
 
-from .constant import Chain, DiamondContract
+from .constant import Chain
 from .contract import ConnextDiamond
 from .utils import print_log
 
@@ -139,16 +138,22 @@ class ScanAPI(object):
         
         if chain == Chain.ETHEREUM:
             self.apikeys = os.getenv("ETHERSCAN_APIKEYS").split(",")
+            self.scan_name = "Etherscan"
         elif chain == Chain.BNB_CHAIN:
             self.apikeys = os.getenv("BSCSCAN_APIKEYS").split(",")
+            self.scan_name = "BSCScan"
         elif chain == Chain.POLYGON:
             self.apikeys = os.getenv("POLYGONSCAN_APIKEYS").split(",")
+            self.scan_name = "PolygonScan"
         elif chain == Chain.OPTIMISM:
             self.apikeys = os.getenv("OPTIMISTICSCAN_APIKEYS").split(",")
+            self.scan_name = "OptimisticScan"
         elif chain == Chain.ARBITRUM_ONE:
             self.apikeys = os.getenv("ARBITRUMSCAN_APIKEYS").split(",")
+            self.scan_name = "ArbitrumScan"
         elif chain == Chain.GNOSIS:
             self.apikeys = os.getenv("GNOSISSCAN_APIKEYS").split(",")
+            self.scan_name = "GnosisScan"
         else:
             raise Exception("Chain {chain} not supported")
 
@@ -206,8 +211,13 @@ class ScanAPI(object):
                     raise ConnectionError(f"Request failed with status code {response.status_code}")
             except (ConnectionError, requests.exceptions.ReadTimeout) as e:
                 # check if we have reached max attempt
-                logging.warning(f"Failed to fetch Etherscan API [{attempt}/{max_attempt}], retrying...")
+                print_log(f"[+] Failed to fetch {self.scan_name} API [{attempt}/{max_attempt}], retrying...")
+                print_log(f"[-] Error Message: {e}")
                 if attempt == max_attempt:
+                    print_log(f"[+] Failed to fetch {self.scan_name} API after {max_attempt} attempts, giving up...")
+                    print_log(f"[-] Parameter: {params}")
+                    print_log(f"[-] URL: {url}")
+                    print_log(f"[-] Error Message: {e}")
                     raise e
 
                 # sleep for a bit
@@ -352,7 +362,6 @@ class ScanAPI(object):
                 "offset": offset,
                 "sort": "asc",
             }
-            print_log(f"params: {params}")
             response = self.request_with_retry(
                 url=self.api_url,
                 params=params,
@@ -399,7 +408,7 @@ class ScanAPI(object):
         self, 
         datetime: datetime,
         close: str = "before",
-        max_attempt: int = 5,
+        max_attempt: int = 20,
         wait_time: int = 1,
         timeout: int = 30,
         **kwargs) -> int:
@@ -425,7 +434,7 @@ class ScanAPI(object):
     def resolve_blocktime(
         self, 
         blocktime: int,
-        max_attempt: int = 5,
+        max_attempt: int = 20,
         wait_time: int = 1,
         timeout: int = 30,
         **kwargs) -> int:

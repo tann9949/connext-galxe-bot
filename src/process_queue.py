@@ -95,6 +95,7 @@ def get_block_range(chain: Chain, start_datetime: str, end_datetime: str) -> tup
 def insert_transactions(
     fetched_items: list, 
     table_name: str,
+    exist_check: bool = True,
 ) -> None:
     print(f"[+] Adding {len(fetched_items)} items to mysql db")
     cnx = pymysql.connect(
@@ -107,6 +108,17 @@ def insert_transactions(
     for item in fetched_items:
         with cnx.cursor() as cursor:
             print_log(f"[-] Adding {item} to mysql db")
+
+            if exist_check:
+                query = (
+                    f"SELECT * FROM {table_name} "
+                    "WHERE hash=%(hash)s AND user_address=%(user_address)s AND token_address=%(token_address)s AND token_amount=%(token_amount)s AND action=%(action)s"
+                )
+                cursor.execute(query, item)
+                if cursor.rowcount > 0:
+                    print_log(f"[-] {cursor.rowcount} record already exists. Skipping...")
+                    continue
+
             query = (
                 f"INSERT INTO {table_name} "
                 "(timestamp, chain, hash, user_address, token_address, token_amount, action) "
@@ -119,11 +131,13 @@ def insert_transactions(
 
 def process_transaction(
     record: dict, 
+    exist_check: bool = True,
 ) -> list:
     """
     Process a transaction record from AWS SQS
     """
     print_log("[+] Processing transaction record")
+    print_log(f"[-] Enabling exist check: {exist_check}")
     chain = int(record.get("chain"))
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
@@ -227,17 +241,19 @@ def process_transaction(
             continue
 
     # add to mysql db
-    insert_transactions(fetched_items, table_name)
+    insert_transactions(fetched_items, table_name, exist_check=exist_check)
     return fetched_items
     
 
 def process_transfers(
     record: dict, 
+    exist_check: bool = True,
 ) -> list:
     """
     Process a transaction record from AWS SQS
     """
     print_log("[+] Processing transfers record")
+    print_log(f"[-] Enabling exist check: {exist_check}")
     chain = record.get("chain")
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
@@ -337,6 +353,6 @@ def process_transfers(
             print_log(e)
             continue
 
-    insert_transactions(fetched_items, table_name)
+    insert_transactions(fetched_items, table_name, exist_check=exist_check)
 
     return fetched_items
