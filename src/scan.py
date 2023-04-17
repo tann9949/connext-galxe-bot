@@ -152,22 +152,22 @@ class ScanAPI(object):
         else:
             raise Exception("Chain {chain} not supported")
 
-        print_log(f"Using {len(self.apikeys)} apikeys for {chain}")
+        print_log(f"[-] Using {len(self.apikeys)} apikeys for {chain}")
 
         self.apikey_schedule = apikey_schedule
 
     def get_apikey(self) -> str:
         """Get the next apikey in the list of apikeys. Using a round-robin"""
         if self.apikey_schedule == "roundrobin":
-            print_log(f"Current apikey index: {self.api_idx}")
+            print_log(f"[-] Current apikey index: {self.api_idx}")
             self.api_idx = (self.api_idx + 1) % len(self.apikeys)
-            print_log(f"New apikey index: {self.api_idx}")
+            print_log(f"[-] New apikey index: {self.api_idx}")
             apikey = self.apikeys[self.api_idx]
-            print_log(f"[{self.chain}] Using apikey ({self.api_idx}/{len(self.apikeys)})")
+            print_log(f"[-] [{Chain.resolve_connext_domain(self.chain)}] Using apikey ({self.api_idx}/{len(self.apikeys)})")
         elif self.apikey_schedule == "random":
             self.api_idx = random.choice(range(len(self.apikeys)))
             apikey = self.apikeys[self.api_idx]
-            print_log(f"[{self.chain}] Using apikey ({self.api_idx}/{len(self.apikeys)})")
+            print_log(f"[-] [{Chain.resolve_connext_domain(self.chain)}] Using apikey ({self.api_idx}/{len(self.apikeys)})")
         return apikey
 
     def request_with_retry(
@@ -176,7 +176,7 @@ class ScanAPI(object):
         params: Dict[str, str],
         max_attempt: int = 20,
         wait_time: float = 0.5,
-        timeout: int = 10,
+        timeout: int = 30,
         **kwargs
     ) -> requests.Response:
         """Make a request to the etherscan api with retry"""
@@ -252,6 +252,7 @@ class ScanAPI(object):
         """Get the list of transactions for a specifed contracts"""
         # initialize empty txs
         transactions = []
+        unique_hash = set()
 
         # initial vars
         page = 1
@@ -260,7 +261,7 @@ class ScanAPI(object):
         while True:
             # iterate infinitely until reach the last page
 
-            print_log(f"Fetching page {page} for address {address}")
+            print_log(f"[+] Fetching page {page} for address {address}")
             response = self.request_with_retry(
                 url=self.api_url,
                 params={
@@ -292,8 +293,14 @@ class ScanAPI(object):
                         tx["input"] = self.diamond_contract.decode_input(tx["input"])
                     except ValueError as e:
                         # skip contract creation txs
-                        logging.warning(f"Failed to decode input [{self.chain} : {tx['hash']}]: {e}")
+                        print_log(f"[-] Failed to decode input [{self.chain} : {tx['hash']}]: {e}")
                         pass
+
+                    # remove duplicate txs
+                    if tx["hash"] in unique_hash:
+                        print_log(f"[-] Duplicate tx found: {tx['hash']}, skipping...")
+                        continue
+                    unique_hash.add(tx["hash"])
 
                     txs = ScanTxn(chain=self.chain, **tx)
                     transactions.append(txs)
@@ -315,17 +322,16 @@ class ScanAPI(object):
         startblock: int = 0,
         endblock: int = 999999999,
         offset: int = 1000,
-        timeout: int = 60,
         max_attempt: int = 20,
         wait_time: float = 0.5,
         **kwargs) -> List[ScanTxn]:
         """Get the list of transfer transactions for a specifed contracts"""
         # contract address
-        contract_address =  DiamondContract.get_contract_address(self.chain)
         null_address = "0x0000000000000000000000000000000000000000"
 
         # initialize empty txs
         transactions = []
+        unique_hash = set()
 
         # initial vars
         page = 1
@@ -334,7 +340,7 @@ class ScanAPI(object):
         while True:
             # iterate infinitely until reach the last page
 
-            print_log(f"Fetching page {page} for token {token_address}")
+            print_log(f"[+] Fetching page {page} for token {token_address}")
 
             params = {
                 "module": "account",
@@ -364,9 +370,15 @@ class ScanAPI(object):
 
                     # remove transaction from/to 0x0000
                     if tx["from_address"] == null_address or tx["to_address"] == null_address:
-                        print_log(f"Skipping transaction {tx['hash']} as it is from/to 0x0000")
+                        print_log(f"[-] Skipping transaction {tx['hash']} as it is from/to 0x0000")
                         continue
 
+                    # remove duplicate txs
+                    if tx["hash"] in unique_hash:
+                        print_log(f"[-] Skipping transaction {tx['hash']} as it is a duplicate")
+                        continue
+                    unique_hash.add(tx["hash"])
+                    
                     # convert the tx to ScanTxn object
                     txs = ScanTxn(chain=self.chain, **tx)
                     transactions.append(txs)
@@ -389,9 +401,10 @@ class ScanAPI(object):
         close: str = "before",
         max_attempt: int = 5,
         wait_time: int = 1,
-        timeout: int = 10,
+        timeout: int = 30,
         **kwargs) -> int:
         """Convert datetime to blocktime"""
+        print_log(f"[+] Converting datetime {datetime} to blocktime")
         response = self.request_with_retry(
             url=self.api_url,
             params={
@@ -414,7 +427,7 @@ class ScanAPI(object):
         blocktime: int,
         max_attempt: int = 5,
         wait_time: int = 1,
-        timeout: int = 10,
+        timeout: int = 30,
         **kwargs) -> int:
         """Convert blocktime to unix timestamp"""
         response = self.request_with_retry(
