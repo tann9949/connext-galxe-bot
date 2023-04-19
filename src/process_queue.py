@@ -29,7 +29,9 @@ CHAINS = [
 ]
 FUNCTIONS = [
     "addSwapLiquidity", 
-    "removeSwapLiquidity"
+    "removeSwapLiquidity",
+    "removeSwapLiquidityImbalance",
+    "removeSwapLiquidityOneToken",
 ]
 TOPICS = [ "Transfer" ]
 CONNEXT_TOKENS = list(map(str.lower, [
@@ -96,6 +98,7 @@ def insert_transactions(
     fetched_items: list, 
     table_name: str,
     exist_check: bool = True,
+    epsilon: float = 0.001
 ) -> None:
     print(f"[+] Adding {len(fetched_items)} items to mysql db")
     cnx = pymysql.connect(
@@ -107,14 +110,17 @@ def insert_transactions(
     # add to mysql db
     for item in fetched_items:
         with cnx.cursor() as cursor:
-            print_log(f"[-] Adding {item} to mysql db")
+            print_log(f"[-] Adding {item} to {table_name}")
 
             if exist_check:
                 query = (
                     f"SELECT * FROM {table_name} "
-                    "WHERE hash=%(hash)s AND user_address=%(user_address)s AND token_address=%(token_address)s AND token_amount=%(token_amount)s AND action=%(action)s"
+                    "WHERE hash=%(hash)s AND user_address=%(user_address)s AND token_address=%(token_address)s AND "
+                    "(token_amount=%(token_amount)s OR ABS(token_amount-%(token_amount)s) < 0.0001) AND "
+                    "action=%(action)s"
                 )
                 cursor.execute(query, item)
+                print_log(f"[-] Found a total of {cursor.rowcount} records")
                 if cursor.rowcount > 0:
                     print_log(f"[-] {cursor.rowcount} record already exists. Skipping...")
                     continue
@@ -255,6 +261,9 @@ def process_transfers(
     print_log("[+] Processing transfers record")
     print_log(f"[-] Enabling exist check: {exist_check}")
     chain = record.get("chain")
+    lp_tokens = [
+        Token.get_lp(chain, _token).address.lower().strip() 
+        for _token in [Token.USDC, Token.WETH]]
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
     end_datetime = record.get("end_datetime")
@@ -314,7 +323,7 @@ def process_transfers(
                     continue
 
                 # skip blacklist address
-                if _log["address"].lower() not in CONNEXT_TOKENS:
+                if _log["address"].lower() not in lp_tokens:
                     # skip if transfer aren't LP token
                     continue
 
