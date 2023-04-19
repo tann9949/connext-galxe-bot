@@ -41,7 +41,7 @@ def run_parser() -> Namespace:
     parser.add_argument(
         "--end_datetime",
         type=str,
-        default="2023-04-17T00:00:00",  # currently up to 2023-04-17T15:55:00
+        default="2023-04-17T00:00:00",  # currently up to 2023-04-19T14:00:00
         help="End datetime in ISO format",
     )
     parser.add_argument(
