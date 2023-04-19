@@ -255,7 +255,7 @@ class ScanAPI(object):
         address: str, 
         startblock: int = 0,
         endblock: int = 999999999,
-        offset: int = 1000,
+        offset: int = 300,
         max_attempt: int = 20,
         wait_time: float = 0.5,
         **kwargs) -> List[ScanTxn]:
@@ -331,7 +331,7 @@ class ScanAPI(object):
         token_address: str, 
         startblock: int = 0,
         endblock: int = 999999999,
-        offset: int = 1000,
+        offset: int = 300,
         max_attempt: int = 20,
         wait_time: float = 0.5,
         **kwargs) -> List[ScanTxn]:

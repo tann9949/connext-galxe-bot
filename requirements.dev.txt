@@ -1,0 +1,16 @@
+# packages
+pymysql
+sqlalchemy
+web3
+requests
+
+# development
+python-dotenv
+matplotlib
+seaborn
+plotly
+pymysql
+pandas
+jupyter
+jupyterlab
+ipywidgets
