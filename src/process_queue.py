@@ -98,7 +98,7 @@ def insert_transactions(
     fetched_items: list, 
     table_name: str,
     exist_check: bool = True,
-    epsilon: float = 0.001
+    epsilon: float = 0.00001
 ) -> None:
     print(f"[+] Adding {len(fetched_items)} items to mysql db")
     cnx = pymysql.connect(
@@ -107,6 +107,7 @@ def insert_transactions(
         password=os.getenv("AWS_RDS_PASSWORD"),
         database="connext"
     )
+    print_log(f"[-] db connection established")
     # add to mysql db
     for item in fetched_items:
         with cnx.cursor() as cursor:
@@ -115,22 +116,25 @@ def insert_transactions(
             if exist_check:
                 query = (
                     f"SELECT * FROM {table_name} "
-                    "WHERE hash=%(hash)s AND user_address=%(user_address)s AND token_address=%(token_address)s AND "
-                    "(token_amount=%(token_amount)s OR ABS(token_amount-%(token_amount)s) < 0.0001) AND "
-                    "action=%(action)s"
+                    f"WHERE hash='{item['hash']}' AND user_address='{item['user_address']}' AND token_address='{item['token_address']}' AND "
+                    f"(token_amount={item['token_amount']} OR ABS(token_amount-{item['token_amount']}) < {epsilon}) AND "
+                    f"action={item['action']} AND timestamp={item['timestamp']} AND chain={item['chain']}"
                 )
-                cursor.execute(query, item)
+                cursor.execute(query)
                 print_log(f"[-] Found a total of {cursor.rowcount} records")
                 if cursor.rowcount > 0:
                     print_log(f"[-] {cursor.rowcount} record already exists. Skipping...")
                     continue
-
+            
+            print_log("[-] Inserting record into db, constructing query...")
             query = (
                 f"INSERT INTO {table_name} "
                 "(timestamp, chain, hash, user_address, token_address, token_amount, action) "
-                "VALUES (%(timestamp)s, %(chain)s, %(hash)s, %(user_address)s, %(token_address)s, %(token_amount)s, %(action)s)"
+                f"VALUES ({item['timestamp']}, {item['chain']}, '{item['hash']}', '{item['user_address']}', "
+                f"'{item['token_address']}', {item['token_amount']}, {item['action']})"
             )
-            cursor.execute(query, item)
+            print_log(f"[-] query: {query}")
+            cursor.execute(query)
             cnx.commit()
             print_log(f"[-] {cursor.rowcount} record inserted.")
 
