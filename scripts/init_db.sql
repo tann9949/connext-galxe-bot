@@ -9,7 +9,7 @@ CREATE TABLE PolygonTransactions (
   hash VARCHAR(255) NOT NULL,
   user_address VARCHAR(255) NOT NULL,
   token_address VARCHAR(255) NOT NULL,
-  token_amount FLOAT NOT NULL,
+  token_amount DOUBLE NOT NULL,
   action VARCHAR(255) NOT NULL,
   PRIMARY KEY (id)
 );
@@ -21,7 +21,7 @@ CREATE TABLE ArbitrumTransactions (
   hash VARCHAR(255) NOT NULL,
   user_address VARCHAR(255) NOT NULL,
   token_address VARCHAR(255) NOT NULL,
-  token_amount FLOAT NOT NULL,
+  token_amount DOUBLE NOT NULL,
   action VARCHAR(255) NOT NULL,
   PRIMARY KEY (id)
 );
@@ -33,7 +33,7 @@ CREATE TABLE OptimismTransactions (
   hash VARCHAR(255) NOT NULL,
   user_address VARCHAR(255) NOT NULL,
   token_address VARCHAR(255) NOT NULL,
-  token_amount FLOAT NOT NULL,
+  token_amount DOUBLE NOT NULL,
   action VARCHAR(255) NOT NULL,
   PRIMARY KEY (id)
 );
@@ -45,7 +45,7 @@ CREATE TABLE BNBChainTransactions (
   hash VARCHAR(255) NOT NULL,
   user_address VARCHAR(255) NOT NULL,
   token_address VARCHAR(255) NOT NULL,
-  token_amount FLOAT NOT NULL,
+  token_amount DOUBLE NOT NULL,
   action VARCHAR(255) NOT NULL,
   PRIMARY KEY (id)
 );
@@ -57,7 +57,7 @@ CREATE TABLE GnosisTransactions (
   hash VARCHAR(255) NOT NULL,
   user_address VARCHAR(255) NOT NULL,
   token_address VARCHAR(255) NOT NULL,
-  token_amount FLOAT NOT NULL,
+  token_amount DOUBLE NOT NULL,
   action VARCHAR(255) NOT NULL,
   PRIMARY KEY (id)
 );

@@ -24,7 +24,7 @@ def run_parser() -> Namespace:
     """Parse command line arguments"""
     parser = ArgumentParser(
         description="Run historical transactions/transfers for Connext LP analysis",
-        epilog="Example: python run_historical_transactions.py --start_datetime=2021-01-01T00:00:00Z --end_datetime=2021-01-01T00:00:00Z --time_window=5 --num_jobs=10",
+        epilog="Example: python run_historical_transactions.py --start_datetime=2021-01-01T00:00:00Z --end_datetime=2021-01-01T00:00:00Z --time_window=5",
     )
     parser.add_argument(
         "--chain",
@@ -41,7 +41,7 @@ def run_parser() -> Namespace:
     parser.add_argument(
         "--end_datetime",
         type=str,
-        default="2023-04-17T00:00:00",  # currently up to 2023-04-19T14:00:00
+        default="2023-04-20T11:30:00",  # currently up to 2023-04-20T22:50:00
         help="End datetime in ISO format",
     )
     parser.add_argument(
