@@ -2,3 +2,6 @@ cython
 pymysql
 web3
 requests
+sqlalchemy
+pandas
+dask
