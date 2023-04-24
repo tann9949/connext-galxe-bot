@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import boto3
 
 client = boto3.client("sqs")
-OFFSET = 5  # ensure data are slower than Block Explorer for 5 minutes
+OFFSET = 1  # cover previous 1 minutes
+DELAY = 5  # ensure data are slower than Block Explorer for 5 minutes
 WINDOW = 5
 CHAINS = [
     1869640809,
@@ -21,8 +22,13 @@ QUEUES = [
 
 
 def lambda_handler(event, context):
-    end_time = datetime.now() - timedelta(minutes=OFFSET)
-    start_time = end_time - timedelta(minutes=WINDOW)
+    curr_time = datetime.now()
+    print("Current time:", curr_time)
+    end_time = curr_time - timedelta(minutes=DELAY)
+    start_time = end_time - timedelta(minutes=WINDOW) - timedelta(minutes=OFFSET)
+    
+    start_time = start_time.replace(second=0)
+    end_time = end_time.replace(second=0)
 
     for queue_url in QUEUES:
         entries = []
