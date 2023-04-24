@@ -190,12 +190,20 @@ After configuring the environment variables, you need to configure the triggers.
 Make sure both Lambda function are listening to the correct queue. At this point, you should be able to see the logs from the Lambda function.
 
 ## Fetching historical data
-To fetch historical data, you need to run the `fetch_historical_data.py` script. To do so, follow the instruction below:
+To fetch historical data, you need to run the `run_historical_transactions.py` script. To do so, follow the instruction below:
 ```sh
-python scripts/fetch_historical_data.py --start-date <start-date> --end-date <end-date>
+python scripts/run_historical_transactions.py --start-date <start-date> --end-date <end-date> --time-window <window-size>
 ```
 
-The start date and end date should be in the format of `YYYY-MM-DDTHH:MM:SS`. The script will fetch the data from the start date to the end date and store it in the database.
+If you wish to fetch all chains, you can run the script with the following command:
+```sh
+chmod +x scripts/fetch_all.sh  # Make the script executable
+./scripts/fetch_all.sh <start-date> <end-date> <window-size>
+```
+
+This script will call the [`run_historical_transactions.py`](./scripts/run_historical_transactions.py) for all chains.
+
+The start date and end date should be in the format of `YYYY-MM-DDTHH:MM:SS` (e.g. 2023-04-20T13:00:00). The script will fetch the data from the start date to the end date and store it in the database.
 
 ## Notes
 This is the final project for 2110524 Cloud Computer Technology for Chompakorn Chaksangchaichot (6472014221).
