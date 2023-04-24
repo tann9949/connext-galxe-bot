@@ -15,7 +15,9 @@ from src.process_queue import TABLE_NAME_MAPPER
 from src.token import Token
 from src.utils import print_log
 
-CAMPAIGN_START_DATETIME = datetime.strptime("2023-02-15", "%Y-%m-%d")
+# TODO: fix timezone => midnight UTC
+CAMPAIGN_START_DATETIME = datetime.fromtimestamp(1676419200)
+# CAMPAIGN_START_DATETIME = datetime.strptime("2023-02-15", "%Y-%m-%d")
 
 
 class Utility:
@@ -207,7 +209,7 @@ class ProcessingUtils:
 
         return user_txs
 
-
+    @staticmethod
     def process_user_balance(
         user_tx: pd.DataFrame, 
         latest_date: datetime,
@@ -227,7 +229,7 @@ class ProcessingUtils:
 
         return {
             "elapsed_days": elapsed_days,
-            "resampled_balance": resampled_balance,
+            # "resampled_balance": resampled_balance,
             "twa_balance": twa_balance
         }
 
