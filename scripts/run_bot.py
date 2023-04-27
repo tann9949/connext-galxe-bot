@@ -64,7 +64,7 @@ def query_user(
     min_weth_value: float = 0,
     threshold: float = 0.3
 ) -> None:
-    query = query.lower().strip()
+    query = query.lower().strip().replace("<", "").replace(">", "")
     results = {
         "wallet": query
     }
@@ -85,14 +85,32 @@ def query_user(
         _score = user_scores[(user_scores["chain"] == chain) & (user_scores["token"] == token)].sort_values(
             "balance_change", ascending=False).reset_index(drop=True)
         qualified = _score.iloc[:round(len(_score[_score["balance_change"] > min_value]) * threshold)]
+        min_score = qualified.values[-1]
         user_results = qualified[qualified["user_address"] == query]
+        num_participants = len(_score)
         
         if len(user_results) > 0:
+            # qualified
             query_results[f"{chain}_{token}"] = {
                 "rank": user_results.index[0],
                 "score": user_results["balance_change"].values[0],
-                "qualified": len(qualified)
+                "qualified": len(qualified),
+                "n_participants": num_participants,
+                "min_score": min_score,
+                "is_qualified": True
             }
+        elif query in _score["user_address"]:
+            # not qualified
+            user_results = _score[_score["user_address"] == query]
+            query_results[f"{chain}_{token}"] = {
+                "rank": user_results.index[0],
+                "score": user_results["balance_change"].values[0],
+                "qualified": len(qualified),
+                "n_participants": num_participants,
+                "min_score": min_score,
+                "is_qualified": False
+            }
+
     results["results"] = query_results
     return {
         "statusCode": 200,
@@ -111,18 +129,25 @@ def format_results(wallet: str, results: dict) -> str:
         rank = v["rank"]
         score = v["score"]
         n_qualified = v["qualified"]
+        n_participants = v["n_participants"]
+        min_score = v["min_score"]
 
-        template += f"You are qualified for {token} on {chain}\n"
-        template += f"Rank [{rank} / {n_qualified}]\n"
+        if v["is_qualified"]:
+            template += f"🥳 You are qualified for {token} on {chain}\n"
+        else:
+            template += f"🫣 You are not qualified for {token} on {chain}\n"
+        template += f"    ⏩ There are a total of {n_participants} participants in this pool\n"
+        template += f"    ⏩ You are at rank {rank} among {n_participants} all participants\n"
+        template += f"        🦦 (at least rank {n_qualified} is required for top 30%) 🦥\n"
         if token == Token.CUSDCLP:
-            template += f"Your score: {score:.2f}\n\n"
+            template += f"👀 Your score: {score:.2f}\n\n"
         elif token == Token.CWETHLP:
-            template += f"Your score: {score:.6f}\n\n"
+            template += f"👀 Your score: {score:.6f}\n\n"
 
         chain_qualified.append(chain)
 
-    template += f"You've qualified {len(chain_qualified)} chains!\n"
-    template += f"{chain_qualified}"
+    template += f"⚡️ You've qualified {len(chain_qualified)} chains!\n"
+    template += f"    {chain_qualified}"
     return template
 
 
@@ -135,7 +160,7 @@ async def score_callback(update: Update, context: CallbackContext) -> None:
                      f"Please add your wallet as an argument!\ne.g. /score <wallet>")
         return
     
-    wallet = args[0].lower().strip()
+    wallet = args[0].lower().strip().replace("<", "").replace(">", "")
 
     print_log(f"[{curr_time}] Querying {wallet}")
     results = query_user(wallet, load_cache())
@@ -157,7 +182,7 @@ async def score_filter_callback(update: Update, context: CallbackContext) -> Non
                      f"Please add your wallet and minimum USDC/WETH filter as an argument!\ne.g. /score_filter <min-usdc> <min-weth> <wallet>")
         return
     
-    wallet = args[-1].lower().strip()
+    wallet = args[-1].lower().strip().replace("<", "").replace(">", "")
     try:
         min_usdc = float(args[0].strip())
     except ValueError:
@@ -283,6 +308,7 @@ def plot_user(query: str, timeframe: str = "T") -> None:
                     ax[i].legend()
             ax[i].set_title(f"{_token} Balance")
         fig.suptitle(query)
+    fig.tight_layout()
     fig.savefig(save_path)
     return save_path
 

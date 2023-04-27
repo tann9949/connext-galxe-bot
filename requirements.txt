@@ -5,3 +5,6 @@ requests
 sqlalchemy
 pandas
 dask
+python-dotenv
+matplotlib
+python-telegram-bot

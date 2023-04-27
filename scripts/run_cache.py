@@ -85,7 +85,7 @@ def calculate_average_balance_by_minute(user_balance):
     temp = pd.Series(data=[0., 0.], index=[CAMPAIGN_START_DATETIME, LATEST_DATE], name="balance_change")
     score = pd.concat(
         [user_balance, temp]
-    ).cumsum().resample("T").last().ffill().between_time(
+    ).sort_index().cumsum().resample("T").last().ffill().between_time(
         CAMPAIGN_START_DATETIME.time(), 
         LATEST_DATE.time()).mean()
 
