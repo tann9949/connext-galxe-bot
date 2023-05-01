@@ -1,5 +1,5 @@
-# Connext Galxe Dashboard
-The script to automatically fetch Connext Liquidity transaction for it's [Liquidity Bootstraping Campaign](https://blog.connext.network/providing-liquidity-on-connext-f7aa3f2bc7b8). The
+# Connext Telegram Bot for Liquidity Bootstraping Campaign
+The script to automatically fetch Connext Liquidity transaction for it's [Liquidity Bootstraping Campaign](https://blog.connext.network/providing-liquidity-on-connext-f7aa3f2bc7b8).
 
 ## Table of Contents
   - [Architecture](#architecture)
@@ -8,7 +8,7 @@ The script to automatically fetch Connext Liquidity transaction for it's [Liquid
     - [Setting up RDS](#setting-up-rds)
     - [Setting up SQS](#setting-up-sqs)
     - [Setting up Lambda function that attached with CloudWatch Event](#setting-up-lambda-function-that-attached-with-cloudwatch-event)
-  - [Usage](#usage)
+  - [Setting up Lambda Function](#setting-up-lambda-function)
     - [1. Setup AWS CLI](#1-setup-aws-cli)
       - [1.1 Installation](#11-installation)
       - [1.2 Authrization](#12-authrization)
@@ -23,6 +23,7 @@ The script to automatically fetch Connext Liquidity transaction for it's [Liquid
       - [4.2 Create Lambda Function](#42-create-lambda-function)
     - [5. Configure Environment variables](#5-configure-environment-variables)
     - [6. Configure trigger](#6-configure-trigger)
+    - [7. Initialize EC2 instance](#7-initialize-ec2-instance)
   - [Fetching historical data](#fetching-historical-data)
   - [Notes](#notes)
   - [Authors](#authors)
@@ -35,6 +36,8 @@ For the cloud provider, we utilize AWS as it is the most popular cloud provider 
 To make the data available in real-time, we utilized CloudWatch Event to trigger the Lambda function every 5 minutes. The Lambda function will process the event and store it as a queue in AWS Simple Queue Service (SQS). Then, another Lambda function will be triggered to fetch the data from the queue and store it in AWS Relational Database Service (RDS) as a MySQL database. Note that we have 2 separate Lambda functions that will read from the queue to capture two types of events.
 
 The first Lambda function will capture any `addSwapLiquidity` or `removeSwapLiquidity` transcation. In other word, the first lambda function will keep tracking of any mint/burn event of the Connext LP. The second Lambda function will capture all `Transfer` event. In other word, the second lambda function will keep tracking of any transfer of the Connext LP.
+
+The EC2 instance will be used to compute time-weighted average (aka. score) of each user. The score will be calculated every 15 minutes, and stored in local computer. At the same time, this instance will run a telegram bot script that will listen to any command from the user. The user can use the telegram bot to query their score.
 
 Both events will be stored in the same SQL database in the RDS. The schema of the database is as follow:
 
@@ -95,7 +98,7 @@ Make sure you save those `Queue URL` for both queue as you will need it later.
 At this point, you have successfully created the Lambda function that will listen to the CloudWatch Event and trigger the Lambda function that will feed the data to the SQS. You can check if the function is working properly by looking at the `Monitoring` tab. You should see the `Invocations` increasing every 5 minutes, and your queue should have some messages in it.
 
 
-## Usage
+## Setting up Lambda Function
 This section will explain how to deploy the Lambda function to your AWS account. Note that **you need to have an AWS account** as well as already follow the instruction in the [Prerequisite](#prerequisite) section.
 
 ### 1. Setup AWS CLI
@@ -132,7 +135,7 @@ Then, you need to build a docker image. To do so, follow the instruction below:
 ```sh
 docker build --platform=linux/amd64 -t <container-name> -f transactions.dockerfile .
 ```
-Also, you need to specify the `container-name` in the command above. If you want to build the docker image for the transfers, you can use the `transfers.dockerfile` instead.
+Also, you need to specify the `container-name` in the command above. If you want to build the docker image for the transfers, you can use the `transfers.dockerfile` instead. Also, note that the `--platform=linux/amd64` is required only if you are using M1 Mac.
 
 #### 3.3 Tag docker
 After building the docker image, you need to tag it. To do so, follow the instruction below:
@@ -188,6 +191,54 @@ After configuring the environment variables, you need to configure the triggers.
 5. Click on `Add`
 
 Make sure both Lambda function are listening to the correct queue. At this point, you should be able to see the logs from the Lambda function.
+
+### 7. Initialize EC2 instance
+For this step, you are creating an EC2 instance that will be used to initialize the python telegram bot. To do so, follow the instruction below:
+1. Create an EC2 instance with the following configuration:
+    - AMI: Ubuntu Server 20.04 LTS (HVM), SSD Volume Type
+    - Instance type: c5.large (This is the minimum requirement as a burstable compute-optimized instance is required to compute the cache data)
+    - Security group: Make sure to allow SSH and HTTP
+2. SSH into the instance
+3. Preparing packages by copying [`src`](./src/), [`run_cache.py`](./scripts/run_cache.py), [`run_bot.py`](./scripts/run_bot.py) and [`requirements.txt`](./requirements.txt) from this repository to the instance
+```sh
+scp -i <path-to-pem-file> -r src ubuntu@<ec2-instance-public-ip>:/home/ubuntu
+scp -i <path-to-pem-file> -r requirements.txt ubuntu@<ec2-instance-public-ip>:/home/ubuntu
+scp -i <path-to-pem-file> run_cache.py ubuntu@<ec2-instance-public-ip>:/home/ubuntu
+scp -i <path-to-pem-file> run_bot.py ubuntu@<ec2-instance-public-ip>:/home/ubuntu
+```
+4. Install python3.8, pip3, and setting up virtual environment
+```sh
+sudo apt update
+sudo apt install python3.8 python3-pip
+sudo apt install python3.8-venv
+python3.8 -m venv venv
+source venv/bin/activate  # Activate virtual environment
+```
+5. Install required packages
+```sh
+pip3 install -r requirements.txt
+```
+6. Create a telegram bot and get the API key from [here](https://core.telegram.org/bots#6-botfather)
+7. Create a `.env` file and add the following variables:
+```sh
+TELEGRAM_BOT_TOKEN=<telegram-bot-token>
+AWS_RDS_HOSTNAME=<hostname-of-rds-database>
+AWS_RDS_USERNAME=<username-of-rds-database>
+AWS_RDS_PASSWORD=<password-of-rds-database>
+DEBUG=true
+```
+8. Setting up cronjob to run the script every 15 minutes
+```sh
+crontab -e
+```
+Add the following line to the file:
+```sh
+*/15 * * * * /home/ubuntu/venv/bin/python /home/ubuntu/src/run_telegram_bot.py > /home/ubuntu/cron.log 2>&1
+```
+9. Run the script
+```sh
+python run_telegram_bot.py
+```
 
 ## Fetching historical data
 To fetch historical data, you need to run the `run_historical_transactions.py` script. To do so, follow the instruction below:
