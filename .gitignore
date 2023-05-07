@@ -6,6 +6,7 @@ venv
 **/.DS_Store
 **/__pycache__/
 **/.ipynb_checkpoints/
+**/*.log
 .vscode
 notebooks/cache
 cache
