@@ -40,6 +40,8 @@ class ConnextTelegramBot(object):
         self.add_default_handler()
         self.add_command_handler("start", ConnextTelegramBot.start_callback)
         self.add_command_handler("help", ConnextTelegramBot.start_callback)
+        self.add_command_handler("calculation", ConnextTelegramBot.calculation_callback)
+        self.add_command_handler("source", ConnextTelegramBot.source_callback)
         self.add_command_handler(
             "campaign1_stats", 
             partial(
@@ -93,14 +95,43 @@ class ConnextTelegramBot(object):
 
     async def start_callback(update: Update, context: CallbackContext) -> None:
         """Send a message when the command /start is issued."""
+        print_log("Default callback triggered")
         await reply_markdown(update,
-            "👾 Welcome to the Connext LP Rewards Bot\!\n"
-            "The bot🤖 was created by Connext Contributor to facilitate the LP Rewards campaign\n\n"
+            "👾 Welcome to the Unofficial Connext Galxe Bot\!\n"
+            "The bot🤖 was **created by Connext Contributor** \(not the team\!\) to facilitate the LP Rewards campaign\n\n"
             "To use the bot, you can use the following commands👇:\n"
             "`/campaign1_score <wallet>` \- Get your score for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign1_score_filter <wallet> <token>` \- Get your score with filters applied for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign1_stats <wallet>` \- Get your historical LP stats for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
-            "`/help` or `/start` \- Get help on how to use the bot")
+            "`/source` \- Get the source code of this project\n"
+            "`/calculation` \- Understand how scores are calculated\n"
+            "`/help` or `/start` \- Get help on how to use the bot\n\n"
+            "🚨 Note that the results showed by this bot **is consider not a final decision** \!\n"
+            "❗️ **The final decision will be made by the Connext team after sybil filtering was applied\!**")
+        
+    @staticmethod
+    async def source_callback(update: Update, context: CallbackContext) -> None:
+        """Return string specifying source code"""
+        print_log("Source code callback triggered")
+        await reply_markdown(update,
+            "🤖💻🔧 **Bot Source Code**\n"
+            "The source code of this project can be found [here](https://github.com/tann9949/connext-galxe-bot/)\n\n"
+            "If you want to report any bugs, feels free to report it to `@chompk.eth` in [Connext Discord](https://discord.gg/connext)")
+        
+    @staticmethod
+    async def calculation_callback(update: Update, context: CallbackContext) -> None:
+        """Return string specifying calculation method"""
+        print_log("Calculation callback triggered")
+        await reply_markdown(update,
+            "📟 **Score calculation Guide**\n\n"
+            "The score is calculated using the time\-weighted average"
+            "LP position where the timeframe for averaging is 1 minute\."
+            "\n\n"
+            "The score are then sorted and top 30\% are considered qualified\."
+            "\n\n"
+            "If there's any filter applied, any position that have an average"
+            "LP position with less than specified will be removed\. Causing the"
+            "number of top 30\% to be further reduced\.\n\n")
         
     @staticmethod
     async def stats_callback(update: Update, context: CallbackContext, campaign_name: str, bot: ConnextTelegramBot) -> None:
@@ -144,8 +175,9 @@ class ConnextTelegramBot(object):
         # get arguments
         args = context.args
         if len(args) != 1:
-            await reply_message(update,
-                        f"Please add your wallet as an argument!\ne.g. /score <wallet>")
+            await reply_message(
+                update,
+                f"Please add your wallet as an argument!\ne.g. /campaign1_score 0x1234...5678")
             return
         wallet = args[0].lower().strip()\
             .replace("<", "").replace(">", "")\
@@ -186,7 +218,7 @@ class ConnextTelegramBot(object):
                 update,
                 f"Please add your wallet and minimum {token1}/{token2} "
                 f"filter as an argument!\ne.g. "
-                f"/score_filter <min-{token1}> <min-{token2}> <wallet>")
+                f"/{campaign_name}score_filter <min-{token1}> <min-{token2}> <wallet>")
             return
         
         # get arguments

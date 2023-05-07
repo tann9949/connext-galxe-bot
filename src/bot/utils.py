@@ -188,6 +188,14 @@ def plot_user(
 def format_results(wallet: str, results: dict) -> str:
     template = f"Wallet address: {wallet}\n\n"
 
+    if "filters" in results:
+        template += f"🔫 Applied filters:\n"
+        for _token, _min_value in results["filters"].items():
+            if _token == Token.CWETHLP:
+                template += f"    ⏩ {_min_value:.6f} {_token}\n"
+            else:
+                template += f"    ⏩ {_min_value:.2f} {_token}\n"
+
     chain_qualified = []
     for k, v in results["results"].items():
         items = k.split("_")
@@ -197,24 +205,26 @@ def format_results(wallet: str, results: dict) -> str:
         score = v["score"]
         n_qualified = v["qualified"]
         n_participants = v["n_participants"]
-        min_score = v["min_score"]
+        min_score = v["min_score"][-2]
 
         if v["is_qualified"]:
-            template += f"🥳 You are qualified for {token} on {chain}\n"
+            template += f"\n🥳 You are qualified for {token} on {chain}\n"
         else:
-            template += f"🫣 You are not qualified for {token} on {chain}\n"
+            template += f"\n🫣 You are not qualified for {token} on {chain}\n"
+        
+        if token in [Token.CUSDCLP, Token.CUSDTLP, Token.CDAILP]:
+            template += f"    ⏩ Your score is {score:.2f} compared to the minimum score of {min_score:.2f}\n"
+        else:
+            template += f"    ⏩ Your score is {score:.6f} compared to the minimum score of {min_score:.6f}\n"
+
         template += f"    ⏩ There are a total of {n_participants} participants in this pool\n"
         template += f"    ⏩ You are at rank {rank} among {n_participants} all participants\n"
-        template += f"        🦦 (at least rank {n_qualified} is required for top 30%) 🦥\n"
-        if token == Token.CUSDCLP:
-            template += f"👀 Your score: {score:.2f}\n\n"
-        elif token == Token.CWETHLP:
-            template += f"👀 Your score: {score:.6f}\n\n"
+        template += f"        🦦 (at least rank {n_qualified} is required for top 30%)\n"
 
         chain_qualified.append(chain)
 
-    template += f"⚡️ You've qualified {len(chain_qualified)} chains!\n"
-    template += f"    {chain_qualified}"
+    template += f"\n⚡️ You've qualified {len(chain_qualified)} chains!\n"
+    template += f"{chain_qualified}"
     return template
 
 
@@ -252,8 +262,13 @@ def query_user(
     for chain, token in itertools.product(chains, [token1, token2]):
         min_value = min_token1_value if token == token1 else min_token2_value
         chain = Chain.resolve_connext_domain(chain)
-        _score = user_scores[(user_scores["chain"] == chain) & (user_scores["token"] == token)].sort_values(
-            "balance_change", ascending=False).reset_index(drop=True)
+        _score = user_scores[
+            (user_scores["chain"] == chain) & \
+            (user_scores["token"] == token)
+        ].sort_values(
+            "balance_change", 
+            ascending=False
+        ).reset_index(drop=True)
         qualified = _score.iloc[:round(len(_score[_score["balance_change"] > min_value]) * threshold)]
         min_score = qualified.values[-1]
         user_results = qualified[qualified["user_address"] == query]
@@ -269,7 +284,7 @@ def query_user(
                 "min_score": min_score,
                 "is_qualified": True
             }
-        elif query in _score["user_address"]:
+        elif query in _score["user_address"].values:
             # not qualified
             user_results = _score[_score["user_address"] == query]
             query_results[f"{chain}_{token}"] = {
