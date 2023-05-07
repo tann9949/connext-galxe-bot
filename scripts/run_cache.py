@@ -3,26 +3,26 @@ import os
 import time
 from datetime import datetime
 from functools import partial
-from typing import Dict, Optional
+
 
 global_st = time.time()
 if importlib.util.find_spec("src") is None:
     import sys
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
 import dask.dataframe as dd
+import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
 if load_dotenv():
     print(".env loaded")
 
-from src.process_queue import TABLE_NAME_MAPPER
+from src.campaign import CAMPAIGNS, get_checkpoint_dates
 from src.constant import Chain
 from src.erc20 import Token
+from src.process_queue import TABLE_NAME_MAPPER
 from src.utils import print_log
-
 
 # ROOT_DIR = "/home/ubuntu"
 ROOT_DIR = "/Users/chompk.visai/Works/cdao/connext/connext-liquidity-dashboard"
@@ -36,28 +36,6 @@ CHAINS = [
     Chain.BNB_CHAIN,
     Chain.GNOSIS
 ]
-
-CAMPAIGNS = {
-    # https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ
-    "campaign_1": {
-        "tokens": [Token.CUSDCLP, Token.CWETHLP],
-        # 15 Feb 2023 00:00:00 UTC
-        "start": datetime.fromtimestamp(1676419200),
-        # 15 May 2023 00:00:00 UTC
-        "end": datetime.fromtimestamp(1684108800),
-    },
-    # https://galxe.com/connextnetwork/campaign/GCEtNUya7s
-    "campaign_2-rare": {
-        "tokens": [Token.CUSDCLP, Token.CWETHLP],
-        "start": None,
-        "end": None,
-    },
-    "campaign_2": {
-        "tokens": [Token.CUSDTLP, Token.CDAILP],
-        "start": None,
-        "end": None,
-    }
-}
 
 
 def resolve_action(action: int) -> str:
@@ -110,40 +88,6 @@ def save_cache(df: pd.DataFrame, filename: str):
     df.to_csv(filename)
 
 
-def get_checkpoint_dates(campaign_name: str) -> Optional[Dict[str, datetime]]:
-    """Get checkpoint dates for a campaign
-    """
-    checkpoint_dates = {}
-    campaign = CAMPAIGNS.get(campaign_name, None)
-
-    if campaign is None:
-        print_log(f"Campaign {campaign_name} not found")
-        return None
-
-    if campaign["start"] is None or campaign["end"] is None:
-        # campaign has not started or ended
-        print_log(f"Campaign {campaign_name} has not started or ended")
-        return None
-
-    if LATEST_DATE > campaign["end"]:
-        # campaign has ended
-        print_log(f"Campaign {campaign_name} has ended, using end date as checkpoint")
-        checkpoint_dates["end"] = campaign["end"]
-    else:
-        # campaign is still running
-        print_log(f"Campaign {campaign_name} is still running, using latest date as checkpoint")
-        checkpoint_dates["end"] = LATEST_DATE
-
-    if LATEST_DATE > campaign["start"]:
-        # campaign has started
-        checkpoint_dates["start"] = campaign["start"]
-    else:
-        # campaign has not started
-        print_log(f"Campaign {campaign_name} has not started, skipping...")
-        return None
-    return checkpoint_dates
-
-
 def calculate_average_balance_by_minute(
     user_balance: pd.Series,
     start_time: datetime,
@@ -181,7 +125,9 @@ def main() -> None:
 
         for campaign_name, campaign in CAMPAIGNS.items():
             print_log(f"processing {campaign_name}...")
-            checkpoint_dates = get_checkpoint_dates(campaign_name)
+            checkpoint_dates = get_checkpoint_dates(
+                campaign_name=campaign_name, 
+                latest_date=LATEST_DATE)
             if checkpoint_dates is None:
                 print_log(f"no checkpoint dates for {campaign_name}, skipping...")
                 continue
