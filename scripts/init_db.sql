@@ -69,6 +69,6 @@ CREATE TABLE Token (
   address VARCHAR(255) NOT NULL,
   `decimal` INT NOT NULL,
   chain INT NOT NULL,
-  PRIMARY KEY (address)
+  PRIMARY KEY (address, chain),
 );
 CREATE INDEX address_chain_index ON Token (address, chain);

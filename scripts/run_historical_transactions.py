@@ -92,6 +92,7 @@ def get_queue_items(
 
     queue_items = []
     while st < et:
+        st = st - timedelta(minutes=offset)
         end_batch = st + timedelta(hours=time_window+offset) if st + timedelta(hours=time_window) < et else et
         queue_items.append({
             "start_datetime": st.isoformat(), 
@@ -105,6 +106,7 @@ def get_queue_items(
 
 def main(args: Namespace) -> None:
     """Main function"""
+    print("Starting process")
     queue_items = get_queue_items(
         chain=args.chain,
         start_datetime=args.start_datetime,

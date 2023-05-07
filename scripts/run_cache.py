@@ -1,7 +1,14 @@
+import importlib.util
 import os
 import time
-global_st = time.time()
 from datetime import datetime
+from functools import partial
+from typing import Dict, Optional
+
+global_st = time.time()
+if importlib.util.find_spec("src") is None:
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
 import dask.dataframe as dd
@@ -13,9 +20,14 @@ if load_dotenv():
 
 from src.process_queue import TABLE_NAME_MAPPER
 from src.constant import Chain
-from src.token import Token
+from src.erc20 import Token
 from src.utils import print_log
 
+
+# ROOT_DIR = "/home/ubuntu"
+ROOT_DIR = "/Users/chompk.visai/Works/cdao/connext/connext-liquidity-dashboard"
+MIN_VALUE = 1e-7
+LATEST_DATE = None
 
 CHAINS = [
     Chain.ARBITRUM_ONE,
@@ -25,10 +37,27 @@ CHAINS = [
     Chain.GNOSIS
 ]
 
-CAMPAIGN_START_DATETIME = datetime.fromtimestamp(1676419200)
-ROOT_DIR = "/home/ubuntu"
-MIN_VALUE = 1e-7
-LATEST_DATE = None
+CAMPAIGNS = {
+    # https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ
+    "campaign_1": {
+        "tokens": [Token.CUSDCLP, Token.CWETHLP],
+        # 15 Feb 2023 00:00:00 UTC
+        "start": datetime.fromtimestamp(1676419200),
+        # 15 May 2023 00:00:00 UTC
+        "end": datetime.fromtimestamp(1684108800),
+    },
+    # https://galxe.com/connextnetwork/campaign/GCEtNUya7s
+    "campaign_2-rare": {
+        "tokens": [Token.CUSDCLP, Token.CWETHLP],
+        "start": None,
+        "end": None,
+    },
+    "campaign_2": {
+        "tokens": [Token.CUSDTLP, Token.CDAILP],
+        "start": None,
+        "end": None,
+    }
+}
 
 
 def resolve_action(action: int) -> str:
@@ -81,13 +110,54 @@ def save_cache(df: pd.DataFrame, filename: str):
     df.to_csv(filename)
 
 
-def calculate_average_balance_by_minute(user_balance):
-    temp = pd.Series(data=[0., 0.], index=[CAMPAIGN_START_DATETIME, LATEST_DATE], name="balance_change")
+def get_checkpoint_dates(campaign_name: str) -> Optional[Dict[str, datetime]]:
+    """Get checkpoint dates for a campaign
+    """
+    checkpoint_dates = {}
+    campaign = CAMPAIGNS.get(campaign_name, None)
+
+    if campaign is None:
+        print_log(f"Campaign {campaign_name} not found")
+        return None
+
+    if campaign["start"] is None or campaign["end"] is None:
+        # campaign has not started or ended
+        print_log(f"Campaign {campaign_name} has not started or ended")
+        return None
+
+    if LATEST_DATE > campaign["end"]:
+        # campaign has ended
+        print_log(f"Campaign {campaign_name} has ended, using end date as checkpoint")
+        checkpoint_dates["end"] = campaign["end"]
+    else:
+        # campaign is still running
+        print_log(f"Campaign {campaign_name} is still running, using latest date as checkpoint")
+        checkpoint_dates["end"] = LATEST_DATE
+
+    if LATEST_DATE > campaign["start"]:
+        # campaign has started
+        checkpoint_dates["start"] = campaign["start"]
+    else:
+        # campaign has not started
+        print_log(f"Campaign {campaign_name} has not started, skipping...")
+        return None
+    return checkpoint_dates
+
+
+def calculate_average_balance_by_minute(
+    user_balance: pd.Series,
+    start_time: datetime,
+    end_time: datetime,
+) -> float:
+    """
+    Calculate average user balance by minute
+    """
+    temp = pd.Series(data=[0., 0.], index=[start_time, end_time], name="balance_change")
     score = pd.concat(
         [user_balance, temp]
     ).sort_index().cumsum().resample("T").last().ffill().between_time(
-        CAMPAIGN_START_DATETIME.time(), 
-        LATEST_DATE.time()).mean()
+        start_time.time(), 
+        end_time.time()).mean()
 
     return score
 
@@ -97,30 +167,45 @@ def main() -> None:
 
     all_chains_data = []
     for chain in CHAINS:
+        # Load dataset from RDS
         print_log(f"loading dataset for {Chain.resolve_connext_domain(chain)}...")
         st = time.time()
         dataset = load_dataset(chain)
         all_chains_data.append(dataset)
+        # get latest date from each chaind database
         global LATEST_DATE
         LATEST_DATE = dataset.index.max()
 
-        dataset = dd.from_pandas(dataset, npartitions=5)
         print_log(f"{len(dataset)} data loaded")
         print_log(f"dataset loaded in {time.time() - st:.2f} seconds")
 
-        st = time.time()
-        user_scores = dataset.groupby(["user_address", "token"])["balance_change"].apply(
-            calculate_average_balance_by_minute, 
-            meta=("balance_change", float)
-        ).compute()
-        print_log(f"compute user scores: {time.time() - st:.2f} seconds")
+        for campaign_name, campaign in CAMPAIGNS.items():
+            print_log(f"processing {campaign_name}...")
+            checkpoint_dates = get_checkpoint_dates(campaign_name)
+            if checkpoint_dates is None:
+                print_log(f"no checkpoint dates for {campaign_name}, skipping...")
+                continue
+            print_log(f"Campaign checkpoint dates: {checkpoint_dates['start']} - {checkpoint_dates['end']}")
 
-        st = time.time()
-        save_cache(
-            user_scores, 
-            f"{ROOT_DIR}/cache/{Chain.resolve_connext_domain(chain)}_user_scores.csv")
-        print_log(f"cache user scores: {time.time() - st:.2f} seconds")
-        print_log(f"cache for {Chain.resolve_connext_domain(chain)} completed")
+            # compute user scores of each campaign
+            st = time.time()
+            dataset = dd.from_pandas(dataset[dataset["token"].isin(campaign["tokens"])], npartitions=5)
+            user_scores = dataset.groupby(["user_address", "token"])["balance_change"].apply(
+                partial(
+                    calculate_average_balance_by_minute, 
+                    start_time=checkpoint_dates["start"],
+                    end_time=checkpoint_dates["end"],
+                ),
+                meta=("balance_change", float)
+            ).compute()
+            print_log(f"compute user scores: {time.time() - st:.2f} seconds")
+
+            st = time.time()
+            save_cache(
+                user_scores, 
+                f"{ROOT_DIR}/cache/{campaign_name}/{Chain.resolve_connext_domain(chain)}_user_scores.csv")
+            print_log(f"cache user scores: {time.time() - st:.2f} seconds")
+            print_log(f"cache for {Chain.resolve_connext_domain(chain)} completed")
 
     all_chains_data = pd.concat(all_chains_data, axis=0).to_csv(f"{ROOT_DIR}/cache/full_dataset.csv")
 
