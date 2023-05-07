@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 
 from src.constant import Chain
 from src.process_queue import TABLE_NAME_MAPPER
-from src.token import Token
+from src.erc20 import Token
 from src.utils import print_log
 
 # TODO: fix timezone => midnight UTC
