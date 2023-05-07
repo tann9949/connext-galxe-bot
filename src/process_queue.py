@@ -6,7 +6,7 @@ import pymysql
 from .utils import print_log
 from .constant import Action, Chain, DiamondContract
 from .scan import ScanAPI
-from .token import Token
+from .erc20 import Token
 from .topic_resolver import get_topic_resolver
 
 
@@ -34,38 +34,6 @@ FUNCTIONS = [
     "removeSwapLiquidityOneToken",
 ]
 TOPICS = [ "Transfer" ]
-CONNEXT_TOKENS = list(map(str.lower, [
-    "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
-    "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
-    "0x5e7D83dA751F4C9694b13aF351B30aC108f32C38",
-    "0xA9CB51C666D2AF451d87442Be50747B31BB7d805",
-    "0xc170908481E928DfA39DE3D0d31bEa6292692F8e",
-    "0x223F6A3B8d087741BF99a2531DC53cd15745eBa7",
-    "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
-    "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
-    "0xF96C6d2537e1af1a9503852eB2A4AF264272a5B6",
-    "0x4b8BaC8Dd1CAA52E32C07755c17eFadeD6A0bbD0",
-    "0xa03258b76Ef13AF716370529358f6A79eb03ec12",
-    "0xeF1348dAC70e8349513E4Ae7498F302e27102101",
-    "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
-    "0x4200000000000000000000000000000000000006",
-    "0x67E51f46e8e14D4E4cab9dF48c59ad8F512486DD",
-    "0xbAD5B3c68F855EaEcE68203312Fd88AD3D365e50",
-    "0xB12A1Be740B99D845Af98098965af761be6BD7fE",
-    "0x3C12765d3cFaC132dE161BC6083C886B2Cd94934",
-    "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
-    "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
-    "0x8c556cF37faa0eeDAC7aE665f1Bb0FbD4b2eae36",
-    "0x2983bf5c334743Aa6657AD70A55041d720d225dB",
-    "0xDa492C29D88FfE9B7cbfA6DC068C2f9befaE851b",
-    "0xb86AF5eB59A8e871bfA573FA656123ea86F47c3a",
-    "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",
-    "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1",
-    "0x44CF74238d840a5fEBB0eAa089D05b763B73faB8",
-    "0x538E2dDbfDf476D24cCb1477A518A82C9EA81326",
-    "0xA639FB3f8C52e10E10a8623616484d41765d5F82",
-    "0x7aC5bBefAE0459F007891f9Bd245F6beaa91076c",
-]))
 
 # constant to resolve topic id
 TOPIC2SIG = get_topic_resolver()
@@ -139,6 +107,18 @@ def insert_transactions(
             print_log(f"[-] {cursor.rowcount} record inserted.")
 
 
+def get_whitelist_tokens(chain: Chain, cast_lower: bool = True) -> list:
+    whitelist_tokens = []
+    for token_type in Token.address_mapper[chain].values():
+        for _token in token_type.values():
+            _addr = _token.address
+            if cast_lower:
+                _addr = _addr.lower()
+            
+            whitelist_tokens.append(_addr)
+    return whitelist_tokens
+
+
 def process_transaction(
     record: dict, 
     exist_check: bool = True,
@@ -152,9 +132,11 @@ def process_transaction(
     table_name = TABLE_NAME_MAPPER.get(chain)
     start_datetime = record.get("start_datetime")
     end_datetime = record.get("end_datetime")
+    whitelist_tokens = get_whitelist_tokens(chain)
     print_log(f"[-] Chain: {Chain.resolve_connext_domain(chain)}")
     print_log(f"[-] Time fetch: {start_datetime} -> {end_datetime}")
     print_log(f"[-] Table: {table_name}")
+    print_log(f"[-] Whitelist tokens: {whitelist_tokens}")
     if not chain:
         raise Exception("Chain not found in queue record")
     scan_api = ScanAPI(chain, apikey_schedule="random")
@@ -211,8 +193,11 @@ def process_transaction(
                     continue
 
                 # skip unwanted address
-                if _log["address"].lower() not in CONNEXT_TOKENS:
+                if _log["address"].lower() not in whitelist_tokens:
+                    print_log(f"[-] Skipping {_log['address']} address")
                     continue
+
+                print_log(f"[-] Processing {topic_name} topic for token {_log['address']}")
 
                 # for Transfer topic
                 sender, receiver = topic_args
