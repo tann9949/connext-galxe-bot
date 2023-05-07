@@ -14,8 +14,7 @@ from src.bot.bot import ConnextTelegramBot
 from src.constant import Chain
 from src.erc20 import Token
 
-# ROOT_DIR = "/home/ubuntu"
-ROOT_DIR = "/Users/chompk.visai/Works/cdao/connext/connext-liquidity-dashboard"
+ROOT_DIR = "/home/ubuntu"
 LOG_FILE = f"{ROOT_DIR}/bot.log"
 CACHE_PATH = f"{ROOT_DIR}/cache"
 LP_TOKENS = [Token.CUSDCLP, Token.CWETHLP]

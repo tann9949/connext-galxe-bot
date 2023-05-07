@@ -24,8 +24,7 @@ from src.erc20 import Token
 from src.process_queue import TABLE_NAME_MAPPER
 from src.utils import print_log
 
-# ROOT_DIR = "/home/ubuntu"
-ROOT_DIR = "/Users/chompk.visai/Works/cdao/connext/connext-liquidity-dashboard"
+ROOT_DIR = "/home/ubuntu"
 MIN_VALUE = 1e-7
 LATEST_DATE = None
 
