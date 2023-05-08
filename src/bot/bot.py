@@ -95,7 +95,7 @@ class ConnextTelegramBot(object):
 
     async def start_callback(update: Update, context: CallbackContext) -> None:
         """Send a message when the command /start is issued."""
-        print_log("Default callback triggered")
+        print_log(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Default callback triggered")
         await reply_markdown(update,
             "👾 Welcome to the Unofficial Connext Galxe Bot\!\n"
             "The bot🤖 was **created by Connext Contributor** \(not the team\!\) to facilitate the LP Rewards campaign\n\n"
@@ -112,7 +112,7 @@ class ConnextTelegramBot(object):
     @staticmethod
     async def source_callback(update: Update, context: CallbackContext) -> None:
         """Return string specifying source code"""
-        print_log("Source code callback triggered")
+        print_log(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Source code callback triggered")
         await reply_markdown(update,
             "🤖💻🔧 **Bot Source Code**\n"
             "The source code of this project can be found [here](https://github.com/tann9949/connext-galxe-bot/)\n\n"
@@ -121,7 +121,7 @@ class ConnextTelegramBot(object):
     @staticmethod
     async def calculation_callback(update: Update, context: CallbackContext) -> None:
         """Return string specifying calculation method"""
-        print_log("Calculation callback triggered")
+        print_log(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Calculation callback triggered")
         await reply_markdown(update,
             "📟 **Score calculation Guide**\n\n"
             "The score is calculated using the time\-weighted average"

@@ -12,12 +12,7 @@ if load_dotenv():
 
 from src.bot.bot import ConnextTelegramBot
 from src.constant import Chain
-from src.erc20 import Token
 
-ROOT_DIR = "/home/ubuntu"
-LOG_FILE = f"{ROOT_DIR}/bot.log"
-CACHE_PATH = f"{ROOT_DIR}/cache"
-LP_TOKENS = [Token.CUSDCLP, Token.CWETHLP]
 CHAINS = [
     Chain.ARBITRUM_ONE,
     Chain.BNB_CHAIN,
@@ -28,9 +23,13 @@ CHAINS = [
 
 
 def main():
+    root_dir = os.getenv("ROOT_DIR", "/home/ubuntu")
+    log_path = f"{root_dir}/bot.log"
+    cache_path = f"{root_dir}/cache"
+
     bot = ConnextTelegramBot(
-        cache_path=CACHE_PATH,
-        log_path=LOG_FILE,
+        cache_path=cache_path,
+        log_path=log_path,
         chains=CHAINS
     )
     bot.run()
