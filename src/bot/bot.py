@@ -10,8 +10,9 @@ from telegram import Update
 from telegram.ext import (Application, CallbackContext, CommandHandler,
                           MessageHandler, filters)
 
-from src.bot.utils import (format_results, plot_user, query_user, reply_image,
-                           reply_markdown, reply_message)
+from src.bot.utils import (format_campaign2s_results, format_results,
+                           plot_user, query_user, reply_image, reply_markdown,
+                           reply_message)
 from src.campaign import CAMPAIGNS
 from src.constant import Chain
 from src.utils import print_log
@@ -37,29 +38,39 @@ class ConnextTelegramBot(object):
         self.app = Application.builder().token(
             token=os.getenv("TELEGRAM_BOT_TOKEN")
         ).build()
+        self.campaigns = {
+            "campaign1": "campaign_1",
+            "campaign2": "campaign_2",
+            "special": "campaign_2-special",
+        }
         self.add_default_handler()
         self.add_command_handler("start", ConnextTelegramBot.start_callback)
         self.add_command_handler("help", ConnextTelegramBot.start_callback)
         self.add_command_handler("calculation", ConnextTelegramBot.calculation_callback)
         self.add_command_handler("source", ConnextTelegramBot.source_callback)
-        self.add_command_handler(
-            "campaign1_stats", 
-            partial(
-                ConnextTelegramBot.stats_callback,
-                campaign_name="campaign_1",
-                bot=self))
-        self.add_command_handler(
-            "campaign1_score", 
-            partial(
-                ConnextTelegramBot.score_callback,
-                campaign_name="campaign_1",
-                bot=self))
-        self.add_command_handler(
-            "campaign1_score_filter", 
-            partial(
-                ConnextTelegramBot.score_filter_callback,
-                campaign_name="campaign_1",
-                bot=self))
+
+        for campaign_cmd, _campaign in self.campaigns.items():
+            print(f"Adding handlers for {campaign_cmd}_stats")
+            self.add_command_handler(
+                f"{campaign_cmd}_stats", 
+                partial(
+                    ConnextTelegramBot.stats_callback,
+                    campaign_name=_campaign,
+                    bot=self))
+            print(f"Adding handlers for {campaign_cmd}_score")
+            self.add_command_handler(
+                f"{campaign_cmd}_score", 
+                partial(
+                    ConnextTelegramBot.score_callback,
+                    campaign_name=_campaign,
+                    bot=self))
+            print(f"Adding handlers for {campaign_cmd}_score_filter")
+            self.add_command_handler(
+                f"{campaign_cmd}_score_filter", 
+                partial(
+                    ConnextTelegramBot.score_filter_callback,
+                    campaign_name=_campaign,
+                    bot=self))
 
     #### bot utility functions ####
 
@@ -103,6 +114,12 @@ class ConnextTelegramBot(object):
             "`/campaign1_score <wallet>` \- Get your score for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign1_score_filter <wallet> <token>` \- Get your score with filters applied for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign1_stats <wallet>` \- Get your historical LP stats for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
+            "`/campaign2_score <wallet>` \- Get your score for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
+            "`/campaign2_score_filter <wallet> <token>` \- Get your score with filters applied for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
+            "`/campaign2_stats <wallet>` \- Get your historical LP stats for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
+            "`/special_score <wallet>` \- Get your score for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
+            "`/special_score_filter <wallet> <token>` \- Get your score with filters applied for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
+            "`/special_stats <wallet>` \- Get your historical LP stats for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
             "`/source` \- Get the source code of this project\n"
             "`/calculation` \- Understand how scores are calculated\n"
             "`/help` or `/start` \- Get help on how to use the bot\n\n"
@@ -142,7 +159,7 @@ class ConnextTelegramBot(object):
         args = context.args
         if len(args) != 1:
             await reply_message(update,
-                        f"Please add your wallet as an argument!\ne.g. /score <wallet>")
+                        f"Please add your wallet as an argument!\ne.g. /campaign1_stats <wallet>")
             return
         wallet = args[0].lower().strip()\
             .replace("<", "").replace(">", "")\
@@ -190,7 +207,11 @@ class ConnextTelegramBot(object):
             user_scores=bot.load_cache(
                 campaign_name=campaign_name),
             chains=bot.chains)
-        template = format_results(wallet, results["body"])
+        
+        if campaign_name == "campaign_2-special":
+            template = format_campaign2s_results(wallet, results["body"])
+        else:
+            template = format_results(wallet, results["body"])
 
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},score\n")

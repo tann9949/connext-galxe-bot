@@ -15,15 +15,19 @@ CAMPAIGNS = {
         "end": datetime.fromtimestamp(1684108800),
     },
     # https://galxe.com/connextnetwork/campaign/GCEtNUya7s
-    "campaign_2-rare": {
+    "campaign_2-special": {
         "tokens": [Token.CUSDCLP, Token.CWETHLP],
-        "start": None,
-        "end": None,
+        # 09 May 2023 00:00:00 UTC
+        "start": datetime.fromtimestamp(1683590400),
+        # 23 June 2023 00:00:00 UTC
+        "end": datetime.fromtimestamp(1687478400),
     },
     "campaign_2": {
         "tokens": [Token.CUSDTLP, Token.CDAILP],
-        "start": None,
-        "end": None,
+        # 09 May 2023 00:00:00 UTC
+        "start": datetime.fromtimestamp(1683590400),
+        # 23 June 2023 00:00:00 UTC
+        "end": datetime.fromtimestamp(1687478400),
     }
 }
 
