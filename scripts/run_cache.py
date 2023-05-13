@@ -24,7 +24,7 @@ from src.erc20 import Token
 from src.process_queue import TABLE_NAME_MAPPER
 from src.utils import print_log
 
-ROOT_DIR = "/home/ubuntu"
+ROOT_DIR = os.getenv("ROOT_DIR", "/home/ubuntu")
 MIN_VALUE = 1e-7
 LATEST_DATE = None
 
@@ -96,13 +96,18 @@ def calculate_average_balance_by_minute(
     Calculate average user balance by minute
     """
     temp = pd.Series(data=[0., 0.], index=[start_time, end_time], name="balance_change")
-    score = pd.concat(
+    resampled_score = pd.concat(
         [user_balance, temp]
     ).sort_index().cumsum().resample("T").last().ffill().between_time(
         start_time.time(), 
-        end_time.time()).mean()
+        end_time.time())
+    score = resampled_score.mean()
+    minutes_qualified = int((resampled_score.apply(
+        lambda x: 0 if x < MIN_VALUE else x
+    ) > 0).sum())
+    del resampled_score
 
-    return score
+    return score, minutes_qualified
 
 
 def main() -> None:
@@ -134,8 +139,14 @@ def main() -> None:
 
             # compute user scores of each campaign
             st = time.time()
-            dataset = dd.from_pandas(dataset[dataset["token"].isin(campaign["tokens"])], npartitions=5)
-            user_scores = dataset.groupby(["user_address", "token"])["balance_change"].apply(
+            dask_dataset = dd.from_pandas(dataset[dataset["token"].isin(campaign["tokens"])], npartitions=5)
+
+            if campaign_name == "campaign_2":
+                groupby_list = ["user_address"]
+            else:
+                groupby_list = ["user_address", "token"]
+
+            user_scores = dask_dataset.groupby(groupby_list)["balance_change"].apply(
                 partial(
                     calculate_average_balance_by_minute, 
                     start_time=checkpoint_dates["start"],
@@ -144,6 +155,8 @@ def main() -> None:
                 meta=("balance_change", float)
             ).compute()
             print_log(f"compute user scores: {time.time() - st:.2f} seconds")
+
+            user_scores = pd.DataFrame(user_scores.tolist(), index=user_scores.index, columns=["score", "minutes_qualified"])
 
             st = time.time()
             save_cache(
