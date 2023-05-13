@@ -64,13 +64,15 @@ class ConnextTelegramBot(object):
                     ConnextTelegramBot.score_callback,
                     campaign_name=_campaign,
                     bot=self))
-            print(f"Adding handlers for {campaign_cmd}_score_filter")
-            self.add_command_handler(
-                f"{campaign_cmd}_score_filter", 
-                partial(
-                    ConnextTelegramBot.score_filter_callback,
-                    campaign_name=_campaign,
-                    bot=self))
+            
+            if _campaign != "campaign_2-special":
+                print(f"Adding handlers for {campaign_cmd}_score_filter")
+                self.add_command_handler(
+                    f"{campaign_cmd}_score_filter", 
+                    partial(
+                        ConnextTelegramBot.score_filter_callback,
+                        campaign_name=_campaign,
+                        bot=self))
 
     #### bot utility functions ####
 
@@ -118,7 +120,6 @@ class ConnextTelegramBot(object):
             "`/campaign2_score_filter <wallet> <token>` \- Get your score with filters applied for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
             "`/campaign2_stats <wallet>` \- Get your historical LP stats for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
             "`/special_score <wallet>` \- Get your score for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
-            "`/special_score_filter <wallet> <token>` \- Get your score with filters applied for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
             "`/special_stats <wallet>` \- Get your historical LP stats for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
             "`/source` \- Get the source code of this project\n"
             "`/calculation` \- Understand how scores are calculated\n"
