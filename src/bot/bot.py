@@ -1,4 +1,5 @@
 from __future__ import annotations
+import itertools
 
 import os
 from datetime import datetime
@@ -48,6 +49,13 @@ class ConnextTelegramBot(object):
         self.add_command_handler("help", ConnextTelegramBot.start_callback)
         self.add_command_handler("calculation", ConnextTelegramBot.calculation_callback)
         self.add_command_handler("source", ConnextTelegramBot.source_callback)
+
+        print("Adding handlers for campaign1")
+        self.add_command_handler("campaign1", partial(
+            ConnextTelegramBot.min_score_campaign1_callback, bot=self))
+        print("Adding handlers for campaign2")
+        self.add_command_handler("campaign2", partial(
+            ConnextTelegramBot.min_score_campaign2_callback, bot=self))
 
         for campaign_cmd, _campaign in self.campaigns.items():
             print(f"Adding handlers for {campaign_cmd}_stats")
@@ -186,6 +194,86 @@ class ConnextTelegramBot(object):
                 fig_path
             )
             os.remove(fig_path)
+
+    @staticmethod
+    async def min_score_campaign1_callback(update: Update, context: CallbackContext, bot: ConnextTelegramBot) -> None:
+        """Calculate a minimum score for each chain"""
+        curr_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{curr_time}] Getting minimum score for campaign 1")
+
+        min_value = 1e-7
+        threshold = 0.3
+        template = "📊 **Minimum Score for [Campaign 1](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)**\n\n"
+
+        for chain in bot.chains:
+            chain = Chain.resolve_connext_domain(chain)
+            chain_name = chain.upper().replace('_', '\_')
+            template += f"🔖**{chain_name}**\n"
+            for i, token in enumerate(CAMPAIGNS["campaign_1"]["tokens"]):
+                campaign_data = bot.load_cache(campaign_name="campaign_1")
+
+                _score = campaign_data[
+                    (campaign_data["chain"] == chain) & \
+                    (campaign_data["token"] == token)
+                ].sort_values(
+                    "score", 
+                    ascending=False
+                ).reset_index(drop=True)
+                qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
+                min_score = qualified["score"].min()
+                num_participants = len(_score)
+                num_qualifiers = len(qualified)
+                print(f"[{curr_time}] Min score campaign 1: {chain} {token} {min_score:.4f} {num_participants} {num_qualifiers}")
+
+                template += f"_{token.upper()}_\n"
+                template += f"Minimum score: `{min_score:.4f} {token}`\n"
+                template += f"Number of participants: `{num_participants}`\n"
+                template += f"Number of qualifiers: `{num_qualifiers}`\n"
+
+                if i == len(CAMPAIGNS["campaign_1"]["tokens"]) - 1:
+                    template += "\n"
+
+        with open(bot.log_path, "a") as fp:
+            fp.write(f"{curr_time},min_score\n")
+        
+        await reply_markdown(update, template)
+
+    @staticmethod
+    async def min_score_campaign2_callback(update: Update, context: CallbackContext, bot: ConnextTelegramBot) -> None:
+        """Calculate a minimum score for each chain"""
+        curr_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{curr_time}] Getting minimum score for campaign 2")
+
+        min_value = 1e-7
+        threshold = 0.3
+        template = "📊 **Minimum Score for [Campaign 2](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)**\n\n"
+
+        for chain in bot.chains:
+            chain = Chain.resolve_connext_domain(chain)
+            chain_name = chain.upper().replace('_', '\_')
+            template += f"🔖**{chain_name}**\n"
+            campaign_data = bot.load_cache(campaign_name="campaign_2")
+
+            _score = campaign_data[
+                (campaign_data["chain"] == chain) 
+            ].sort_values(
+                "score", 
+                ascending=False
+            ).reset_index(drop=True)
+            qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
+            min_score = qualified["score"].min()
+            num_participants = len(_score)
+            num_qualifiers = len(qualified)
+            print(f"[{curr_time}] Min score campaign 2: {chain} {min_score:.4f} {num_participants} {num_qualifiers}")
+
+            template += f"Minimum score: `{min_score:.4f}`\n"
+            template += f"Number of participants: `{num_participants}`\n"
+            template += f"Number of qualifiers: `{num_qualifiers}`\n\n"
+
+        with open(bot.log_path, "a") as fp:
+            fp.write(f"{curr_time},min_score\n")
+        
+        await reply_markdown(update, template)
 
     @staticmethod
     async def score_callback(update: Update, context: CallbackContext, campaign_name: str, bot: ConnextTelegramBot) -> None:
