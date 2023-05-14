@@ -178,6 +178,9 @@ def plot_user(
                     ax[i].legend()
             ax[i].set_title(f"{_token} Balance")
         fig.suptitle(query)
+    else:
+        print_log("No LP tokens found for this user!")
+        return None
 
     #### save plot ###
 

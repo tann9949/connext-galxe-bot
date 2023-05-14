@@ -177,11 +177,15 @@ class ConnextTelegramBot(object):
 
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},stats\n")
-        await reply_image(
-            update,
-            fig_path
-        )
-        os.remove(fig_path)
+
+        if not os.path.exists(fig_path):
+            await reply_message(update, "🤔 You haven't participate in this campaign!")
+        else:
+            await reply_image(
+                update,
+                fig_path
+            )
+            os.remove(fig_path)
 
     @staticmethod
     async def score_callback(update: Update, context: CallbackContext, campaign_name: str, bot: ConnextTelegramBot) -> None:
