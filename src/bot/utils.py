@@ -1,7 +1,8 @@
 import itertools
 import os
 import time
-from typing import List, Optional
+from typing import Any, List, Optional
+Bot = Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -186,47 +187,23 @@ def plot_user(
 
 
 def format_campaign2s_results(wallet: str, results: dict) -> str:
-    template = f"Wallet address: {wallet}\n\n"
+    template = f"Wallet address: {wallet}\n"
 
-    if "filters" in results and len(results["filters"]) > 0:
-        template += f"🔫 Applied filters:\n"
-        for _token, _min_value in results["filters"].items():
-            if _token == Token.CWETHLP:
-                template += f"    ⏩ {_min_value:.6f} {_token}\n"
-            else:
-                template += f"    ⏩ {_min_value:.2f} {_token}\n"
+    results = results["results"]
 
-    chain_qualified = []
-    for k, v in results["results"].items():
-        items = k.split("_")
-        token = items[-1]
-        chain = " ".join(items[:-1])
-
-        if v["is_qualified"]:
-            template += f"\n🥳 You are qualified for {token} on {chain}\n"
-        else:
-            template += f"\n🫣 You are not qualified for {token} on {chain}\n"
-            template += f"    ⏩ Reason: {v['reason']}\n"
-
-        score = v["score"]
-        if token == Token.CWETHLP:
-            template += f"    ⏩ Your score is {score:.6f}\n"
-        else:
-            template += f"    ⏩ Your score is {score:.2f}\n"
-
-        if v["is_qualified"]:
-            chain_qualified.append(chain)
-
-    template += f"\n⚡️ You've qualified {len(chain_qualified)} chains!\n"
-    template += f"{chain_qualified}"
+    if results["is_qualified"]:
+        template += f"\n🥳 You are qualified for special NFT\n"
+    else:
+        template += f"\n🫣 You are not qualified for special NFT\n"
+        template += f"    ⏩ Reason: {results['reason']}"
     return template
 
 
 def format_results(wallet: str, results: dict) -> str:
-    template = f"Wallet address: {wallet}\n\n"
+    template = f"Wallet address: {wallet}\n"
 
     if "filters" in results and len(results["filters"]) > 0:
-        template += f"🔫 Applied filters:\n"
+        template += f"\n🔫 Applied filters:\n"
         for _token, _min_value in results["filters"].items():
             if _token == Token.CWETHLP:
                 template += f"    ⏩ {_min_value:.6f} {_token}\n"
@@ -257,8 +234,14 @@ def format_results(wallet: str, results: dict) -> str:
         score = v["score"]
         n_qualified = v["qualified"]
         n_participants = v["n_participants"]
-        min_score = v["min_score"][-2]
+        min_score = v["min_score"]
 
+        if not isinstance(min_score, float):
+            min_score = min_score.tolist()
+
+        if not isinstance(score, float):
+            score = score.tolist()
+    
         if token == Token.CWETHLP:
             template += f"    ⏩ Your score is {score:.6f} compared to the minimum score of {min_score:.6f}\n"
         else:
@@ -314,7 +297,7 @@ def query_campaign1(
             ascending=False
         ).reset_index(drop=True)
         qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
-        min_score = qualified.values[-1]
+        min_score = qualified["score"].values[-1]
         user_results = qualified[qualified["user_address"] == query]
         num_participants = len(_score)
         
@@ -382,12 +365,13 @@ def query_campaign2(
         ).reset_index(drop=True)
 
         qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
-        min_score = qualified.values[-1]
+        min_score = qualified["score"].values[-1]
         user_results = qualified[qualified["user_address"] == query]
         num_participants = len(_score)
         
         if len(user_results) > 0:
             # qualified
+            print_log(f"[campaign2] {query}<>{chain} :: qualified")
             query_results[chain] = {
                 "rank": user_results.index[0],
                 "score": user_results["score"].values[0],
@@ -397,6 +381,7 @@ def query_campaign2(
                 "is_qualified": True
             }
         elif query in _score["user_address"].values:
+            print_log(f"[campaign2] {query}<>{chain} :: not qualified")
             # not qualified
             user_results = _score[_score["user_address"] == query]
             query_results[chain] = {
@@ -407,6 +392,8 @@ def query_campaign2(
                 "min_score": min_score,
                 "is_qualified": False
             }
+        else:
+            print_log(f"[campaign2] {query}<>{chain} :: not participated")
 
     results["results"] = query_results
     return results
@@ -414,98 +401,101 @@ def query_campaign2(
 
 def query_campaign2s(
     query: str,
+    campaign1_user_scores: pd.DataFrame,
+    campaign2_user_scores: pd.DataFrame,
     user_scores: pd.DataFrame,
     chains: List[Chain],
-    min_token1_value: float = 0,
-    min_token2_value: float = 0,
     threshold: float = 0.3,
 ):
+    """
+    Criteria for special NFT:
+    1) Eligible for the 1st Campaign
+    2) Eligible for the 2nd Campaign in any pools
+    3) Maintain at least $100 USDC or 0.1 ETH in the LP pool
+    """
     results = {
         "wallet": query,
-        "results": {
-            _chain: {}
-            for _chain in chains
-        }
+        "results": {}
     }
 
-    # get lp tokens associated with the campaign
-    campaign_name = "campaign_2-special"
-    token1, token2 = CAMPAIGNS[campaign_name]["tokens"]
-    
-    # apply filters if needed
-    filters = {}
-    if min_token1_value > 0:
-        print_log(f"Applying filter for with {min_token1_value} {token1}")
-        filters[token1] = min_token1_value
-    if min_token2_value > 0:
-        print_log(f"Applying filter for with {min_token2_value} {token2}")
-        filters[token2] = min_token2_value
-    results["filters"] = filters
-
+    # check if qualified for campaign 1
     campaign1_results = query_campaign1(
         query=query,
-        user_scores=user_scores,
+        user_scores=campaign1_user_scores,
         chains=chains,
-        min_token1_value=min_token1_value,
-        min_token2_value=min_token2_value,
         threshold=threshold
     )
+    campaign1_qualified = any(v["is_qualified"] for v in campaign1_results["results"].values())
 
-    query_results = {}
-    for key, c1_result in campaign1_results["results"].items():
+    # check if qualified for campaign 2
+    campaign2_results = query_campaign2(
+        query=query,
+        user_scores=campaign2_user_scores,
+        chains=chains,
+        threshold=threshold
+    )
+    campaign2_qualified = any(v["is_qualified"] for v in campaign2_results["results"].values())
 
-        if c1_result["is_qualified"]:
-            # if qualified for campaign 1
-            *chain, token = key.split("_")
-            chain = "_".join(chain)
-            
-            _score = user_scores[
-                (user_scores["chain"] == chain) & \
-                (user_scores["token"] == token)
-            ].sort_values(
-                "score", 
-                ascending=False
-            ).reset_index(drop=True)
-            special_threshold = 100 if token == Token.CUSDCLP else 0.1
-            qualified = _score[_score["score"] > special_threshold]
-            user_results = qualified[qualified["user_address"] == query]
-            
-            if len(user_results) > 0:
-                # qualified
-                query_results[f"{chain}_{token}"] = {
-                    "score": user_results["score"].values[0],
-                    "is_qualified": True
-                }
-            elif query in _score["user_address"].values:
-                # not qualified
-                user_results = _score[_score["user_address"] == query]
-                query_results[f"{chain}_{token}"] = {
-                    "score": user_results["score"].values[0],
-                    "is_qualified": False,
-                    "reason": f"Holdings {token} less than {special_threshold} {token}"
-                }
-        else:
-            _score = user_scores[
-                (user_scores["chain"] == chain) & \
-                (user_scores["token"] == token)
-            ].sort_values(
-                "score", 
-                ascending=False
-            ).reset_index(drop=True)
-            query_results[key] = {
-                "score": c1_result["score"],
-                "is_qualified": False,
-                "reason": f"Did not qualify for campaign 1"
-            }
+    # check if minimum is achieved
+    minimum_achieved = False
+    for k, v in campaign1_results["results"].items():
+        if not v["is_qualified"]:
+            continue
 
-    results["results"] = query_results
+        *chain, token = k.split("_")
+        chain = "_".join(chain)
+
+        _score = user_scores[
+            (user_scores["chain"] == chain) & \
+            (user_scores["token"] == token)
+        ].sort_values(
+            "score", 
+            ascending=False
+        ).reset_index(drop=True)
+
+        special_threshold = 100 if token == Token.CUSDCLP else 0.1
+        qualified = _score[_score["score"] > special_threshold]
+        if query in qualified["user_address"].values:
+            minimum_achieved = True
+            break
+
+    if campaign1_qualified and campaign2_qualified and minimum_achieved:
+        # qualified
+        results["results"] = {
+            "is_qualified": True
+        }
+    elif campaign1_qualified and campaign2_qualified and not minimum_achieved:
+        # not qualified
+        results["results"] = {
+            "is_qualified": False,
+            "reason": f"Not maintain at least $100 USDC or 0.1 ETH in the LP pool"
+        }
+    elif campaign1_qualified and not campaign2_qualified:
+        # not qualified
+        results["results"] = {
+            "is_qualified": False,
+            "reason": f"Not eligible for the 2nd Campaign"
+        }
+    elif not campaign1_qualified and campaign2_qualified:
+        # not qualified
+        results["results"] = {
+            "is_qualified": False,
+            "reason": f"Not eligible for the 1st Campaign"
+        }
+    else:
+        # not qualified
+        results["results"] = {
+            "is_qualified": False,
+            "reason": f"Not eligible for the 1st or 2nd Campaign"
+        }
+
     return results
 
 
 def query_user(
     query: str, 
     campaign_name: str,
-    user_scores: Optional[pd.DataFrame],
+    bot: Bot,
     chains: List[Chain],
     min_token1_value: float = 0, 
     min_token2_value: float = 0,
@@ -519,7 +509,7 @@ def query_user(
     if campaign_name == "campaign_1":
         results = query_campaign1(
             query=query,
-            user_scores=user_scores,
+            user_scores=bot.load_cache(campaign_name=campaign_name),
             chains=chains,
             min_token1_value=min_token1_value,
             min_token2_value=min_token2_value,
@@ -528,7 +518,7 @@ def query_user(
     elif campaign_name == "campaign_2":
         results = query_campaign2(
             query=query,
-            user_scores=user_scores,
+            user_scores=bot.load_cache(campaign_name=campaign_name),
             chains=chains,
             min_token1_value=min_token1_value,
             min_token2_value=min_token2_value,
@@ -537,10 +527,10 @@ def query_user(
     elif campaign_name == "campaign_2-special":
         results = query_campaign2s(
             query=query,
-            user_scores=user_scores,
+            campaign1_user_scores=bot.load_cache(campaign_name="campaign_1"),
+            campaign2_user_scores=bot.load_cache(campaign_name="campaign_2"),
+            user_scores=bot.load_cache(campaign_name=campaign_name),
             chains=chains,
-            min_token1_value=min_token1_value,
-            min_token2_value=min_token2_value,
             threshold=threshold
         )
     else:

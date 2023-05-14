@@ -205,8 +205,7 @@ class ConnextTelegramBot(object):
         results = query_user(
             query=wallet, 
             campaign_name=campaign_name,
-            user_scores=bot.load_cache(
-                campaign_name=campaign_name),
+            bot=bot,
             chains=bot.chains)
         
         if campaign_name == "campaign_2-special":

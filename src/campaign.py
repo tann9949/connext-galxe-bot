@@ -9,6 +9,7 @@ CAMPAIGNS = {
     # https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ
     "campaign_1": {
         "tokens": [Token.CUSDCLP, Token.CWETHLP],
+        "sybil_check": [Token.USDC, Token.WETH],
         # 15 Feb 2023 00:00:00 UTC
         "start": datetime.fromtimestamp(1676419200),
         # 15 May 2023 00:00:00 UTC
@@ -24,6 +25,7 @@ CAMPAIGNS = {
     },
     "campaign_2": {
         "tokens": [Token.CUSDTLP, Token.CDAILP],
+        "sybil_check": [Token.USDT, Token.DAI],
         # 09 May 2023 00:00:00 UTC
         "start": datetime.fromtimestamp(1683590400),
         # 23 June 2023 00:00:00 UTC
