@@ -178,7 +178,7 @@ class ConnextTelegramBot(object):
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},stats\n")
 
-        if not os.path.exists(fig_path):
+        if fig_path is None:
             await reply_message(update, "🤔 You haven't participate in this campaign!")
         else:
             await reply_image(
