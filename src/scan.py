@@ -329,6 +329,7 @@ class ScanAPI(object):
     def get_transfer_events(
         self, 
         token_address: str, 
+        address: str = None,
         startblock: int = 0,
         endblock: int = 999999999,
         offset: int = 300,
@@ -362,6 +363,8 @@ class ScanAPI(object):
                 "offset": offset,
                 "sort": "asc",
             }
+            if address is not None:
+                params["address"] = address
             response = self.request_with_retry(
                 url=self.api_url,
                 params=params,

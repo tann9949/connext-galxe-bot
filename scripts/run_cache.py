@@ -98,9 +98,7 @@ def calculate_average_balance_by_minute(
     temp = pd.Series(data=[0., 0.], index=[start_time, end_time], name="balance_change")
     resampled_score = pd.concat(
         [user_balance, temp]
-    ).sort_index().cumsum().resample("T").last().ffill().between_time(
-        start_time.time(), 
-        end_time.time())
+    ).sort_index().cumsum().resample("T").last().ffill()[start_time:end_time]
     score = resampled_score.mean()
     minutes_qualified = int((resampled_score.apply(
         lambda x: 0 if x < MIN_VALUE else x
