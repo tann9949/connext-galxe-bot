@@ -191,23 +191,23 @@ def plot_user(
 
 
 def format_campaign2s_results(wallet: str, results: dict) -> str:
-    template = f"Wallet address: {wallet}\n"
+    template = f"Wallet address: `{wallet}`\n"
 
     results = results["results"]
 
     if results["is_qualified"]:
-        template += f"\n🥳 You are a potential candidate for special NFT\n"
+        template += f"\n🥳 You are a _potential_ candidate for special NFT\n"
     else:
         template += f"\n🫣 You are not qualified for special NFT\n"
-        template += f"    ⏩ Reason: {results['reason']}\n\n"
+        template += f"    ⏩ Reason: {results['reason']}\n"
 
-    template += "🚨 Note that the results showed by this bot **is consider not a final decision!\n"
-    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied!"
+    template += "\n🚨 Note that the results showed by this bot _is consider not a final decision_\!\n"
+    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied\!"
     return template
 
 
 def format_results(wallet: str, results: dict) -> str:
-    template = f"Wallet address: {wallet}\n"
+    template = f"Wallet address: `{wallet}`\n"
 
     # if "filters" in results and len(results["filters"]) > 0:
     #     template += f"\n🔫 Applied filters:\n"
@@ -224,9 +224,9 @@ def format_results(wallet: str, results: dict) -> str:
         chain = " ".join(items[:-1])
 
         if v["is_qualified"]:
-            template += f"\n🥳 You are on a potential top 30% (pre-filtering) for {token} on {chain}\n"
+            template += f"\n🥳 You are on a _potential_ top 30% \(pre\-filtering\) for `{token}` on `{chain}`\n"
         else:
-            template += f"\n🫣 You are not qualified for {token} on {chain}\n"
+            template += f"\n🫣 You are not qualified for `{token}` on `{chain}`\n"
 
         rank = v["rank"]
         score = v["score"]
@@ -241,22 +241,22 @@ def format_results(wallet: str, results: dict) -> str:
             score = score.tolist()
     
         if token == Token.CWETHLP:
-            template += f"    ⏩ Your score is {score:.6f} compared to the minimum score of {min_score:.6f}\n"
+            template += f"    ⏩ Your score is `{score:.6f}` compared to the minimum score of `{min_score:.6f}`\n"
         else:
-            template += f"    ⏩ Your score is {score:.2f} compared to the minimum score of {min_score:.2f}\n"
+            template += f"    ⏩ Your score is `{score:.2f}` compared to the minimum score of `{min_score:.2f}`\n"
 
-        template += f"    ⏩ There are a total of {n_participants} participants in this pool\n"
-        template += f"    ⏩ You are at rank {rank} among {n_participants} all participants\n"
-        template += f"        🦦 (at least rank {n_qualified} is required for top 30%)\n"
+        template += f"    ⏩ There are a total of `{n_participants}` participants in this pool\n"
+        template += f"    ⏩ You are at rank `{rank}` among `{n_participants}` all participants\n"
+        template += f"        🦦 \(at least rank `{n_qualified}` is required for top 30\%\)\n"
 
         if v["is_qualified"]:
             chain_qualified.append(chain)
 
-    template += f"\n⚡️ You've qualified {len(chain_qualified)} chains!\n"
-    template += f"{chain_qualified}\n\n"
+    # template += f"\n⚡️ You've qualified {len(chain_qualified)} chains!\n"
+    # template += f"{chain_qualified}\n\n"
 
-    template += "🚨 Note that the results showed by this bot **is consider not a final decision!\n"
-    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied!"
+    template += "\n\n🚨 Note that the results showed by this bot _is consider not a final decision_\!\n"
+    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied\!"
     return template
 
 
@@ -309,7 +309,7 @@ def query_campaign1(
             _score = _score[holding_minutes >= timedelta(days=30).total_seconds() / 60]
 
         qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
-        min_score = qualified["score"].values[-1]
+        min_score = qualified["score"].min()
         user_results = qualified[qualified["user_address"] == query]
         num_participants = len(_score)
         

@@ -117,14 +117,14 @@ class ConnextTelegramBot(object):
         """Send a message when the command /start is issued."""
         print_log(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Default callback triggered")
         await reply_markdown(update,
-            "👾 Welcome to the Unofficial Connext Galxe Bot\!\n"
+            "👾 Welcome to the **UNOFFICIAL** Connext Galxe Bot\!\n\n"
             "The bot🤖 was **created by Connext Contributor** \(not the team\!\) to facilitate the LP Rewards campaign\n\n"
             "To use the bot, you can use the following commands👇:\n"
             "`/campaign1_score <wallet>` \- Get your score for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
-            "`/campaign1_score_filter <wallet> <token>` \- Get your score with filters applied for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
+            # "`/campaign1_score_filter <wallet> <token>` \- Get your score with filters applied for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign1_stats <wallet>` \- Get your historical LP stats for the [1st Galxe Campaign](https://galxe.com/connextnetwork/campaign/GC1SiU4gvJ)\n"
             "`/campaign2_score <wallet>` \- Get your score for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
-            "`/campaign2_score_filter <wallet> <token>` \- Get your score with filters applied for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
+            # "`/campaign2_score_filter <wallet> <token>` \- Get your score with filters applied for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
             "`/campaign2_stats <wallet>` \- Get your historical LP stats for the [2nd Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCEtNUya7s)\n"
             "`/special_score <wallet>` \- Get your score for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
             "`/special_stats <wallet>` \- Get your historical LP stats for the [Special Galxe Campaign](https://galxe.com/connextnetwork/campaign/GCHhsUEEYn)\n"
@@ -284,15 +284,21 @@ class ConnextTelegramBot(object):
 
                 # remove address provide lower than 30 days
                 holding_minutes = _score["minutes_qualified"].values
-                if datetime.now().timestamp() >= CAMPAIGNS["campaign_2"]["end"].timestamp():
-                    print("30 days reached, filtering out addresses with less than 30 days")
-                    _score = _score[holding_minutes >= timedelta(days=30).total_seconds() / 60]
+                # if today is after the campaign end date - 30 days
+                if datetime.now().timestamp() >= (CAMPAIGNS["campaign_2"]["end"] - timedelta(days=30)).timestamp():
+                    print("campaign took less than 30 days, filtering out addresses with less than 30 days")
+                    # this value converge to 1 as the campaign reaches the end
+                    desired_minutes = min(
+                        (datetime.now() - (CAMPAIGNS["campaign_2"]["end"] - timedelta(days=30))).total_seconds() / 60,
+                        timedelta(days=30).total_seconds() / 60
+                    )
+                    _score = _score[holding_minutes >= desired_minutes]
 
                 qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
                 min_score = qualified["score"].min()
                 num_participants = len(_score)
                 num_qualifiers = len(qualified)
-                print(f"[{curr_time}] Min score campaign 1: {chain} {token} {min_score:.4f} {num_participants} {num_qualifiers}")
+                print(f"[{curr_time}] Min score campaign 2: {chain} {token} {min_score:.4f} {num_participants} {num_qualifiers}")
 
                 template += f"_{token.upper()}_\n"
                 template += f"Minimum score: `{min_score:.4f} {token}`\n"
@@ -344,7 +350,7 @@ class ConnextTelegramBot(object):
 
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},score\n")
-        await reply_message(
+        await reply_markdown(
             update,
             template
         )
