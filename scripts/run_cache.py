@@ -139,10 +139,7 @@ def main() -> None:
             st = time.time()
             dask_dataset = dd.from_pandas(dataset[dataset["token"].isin(campaign["tokens"])], npartitions=5)
 
-            if campaign_name == "campaign_2":
-                groupby_list = ["user_address"]
-            else:
-                groupby_list = ["user_address", "token"]
+            groupby_list = ["user_address", "token"]
 
             user_scores = dask_dataset.groupby(groupby_list)["balance_change"].apply(
                 partial(

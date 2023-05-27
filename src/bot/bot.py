@@ -1,8 +1,7 @@
 from __future__ import annotations
-import itertools
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import partial
 from typing import List, Optional
 
@@ -73,14 +72,14 @@ class ConnextTelegramBot(object):
                     campaign_name=_campaign,
                     bot=self))
             
-            if _campaign != "campaign_2-special":
-                print(f"Adding handlers for {campaign_cmd}_score_filter")
-                self.add_command_handler(
-                    f"{campaign_cmd}_score_filter", 
-                    partial(
-                        ConnextTelegramBot.score_filter_callback,
-                        campaign_name=_campaign,
-                        bot=self))
+            # if _campaign != "campaign_2-special":
+            #     print(f"Adding handlers for {campaign_cmd}_score_filter")
+            #     self.add_command_handler(
+            #         f"{campaign_cmd}_score_filter", 
+            #         partial(
+            #             ConnextTelegramBot.score_filter_callback,
+            #             campaign_name=_campaign,
+            #             bot=self))
 
     #### bot utility functions ####
 
@@ -219,6 +218,17 @@ class ConnextTelegramBot(object):
                     "score", 
                     ascending=False
                 ).reset_index(drop=True)
+
+                # apply default filter
+                min_filter = 0.75 if token == "CUSDCLP" else 0.00075
+                _score = _score[_score["score"] > min_filter]
+
+                # remove address provide lower than 30 days
+                holding_minutes = _score["minutes_qualified"].values
+                if datetime.now().timestamp() >= CAMPAIGNS["campaign_1"]["end"].timestamp():
+                    print("30 days reached, filtering out addresses with less than 30 days")
+                    _score = _score[holding_minutes >= timedelta(days=30).total_seconds() / 60]
+
                 qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
                 min_score = qualified["score"].min()
                 num_participants = len(_score)
@@ -235,6 +245,11 @@ class ConnextTelegramBot(object):
 
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},min_score\n")
+
+        template += (
+            "\n\n"
+            "🚨 Note that the results showed by this bot **is consider not a final decision** \!\n"
+            "❗️ **The final decision will be made by the Connext team after sybil filtering was applied\!**")
         
         await reply_markdown(update, template)
 
@@ -252,23 +267,45 @@ class ConnextTelegramBot(object):
             chain = Chain.resolve_connext_domain(chain)
             chain_name = chain.upper().replace('_', '\_')
             template += f"🔖**{chain_name}**\n"
-            campaign_data = bot.load_cache(campaign_name="campaign_2")
+            for i, token in enumerate(CAMPAIGNS["campaign_2"]["tokens"]):
+                campaign_data = bot.load_cache(campaign_name="campaign_2")
 
-            _score = campaign_data[
-                (campaign_data["chain"] == chain) 
-            ].sort_values(
-                "score", 
-                ascending=False
-            ).reset_index(drop=True)
-            qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
-            min_score = qualified["score"].min()
-            num_participants = len(_score)
-            num_qualifiers = len(qualified)
-            print(f"[{curr_time}] Min score campaign 2: {chain} {min_score:.4f} {num_participants} {num_qualifiers}")
+                _score = campaign_data[
+                    (campaign_data["chain"] == chain) & \
+                    (campaign_data["token"] == token)
+                ].sort_values(
+                    "score", 
+                    ascending=False
+                ).reset_index(drop=True)
 
-            template += f"Minimum score: `{min_score:.4f}`\n"
-            template += f"Number of participants: `{num_participants}`\n"
-            template += f"Number of qualifiers: `{num_qualifiers}`\n\n"
+                # apply default filter
+                min_filter = 1.
+                _score = _score[_score["score"] > min_filter]
+
+                # remove address provide lower than 30 days
+                holding_minutes = _score["minutes_qualified"].values
+                if datetime.now().timestamp() >= CAMPAIGNS["campaign_2"]["end"].timestamp():
+                    print("30 days reached, filtering out addresses with less than 30 days")
+                    _score = _score[holding_minutes >= timedelta(days=30).total_seconds() / 60]
+
+                qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
+                min_score = qualified["score"].min()
+                num_participants = len(_score)
+                num_qualifiers = len(qualified)
+                print(f"[{curr_time}] Min score campaign 1: {chain} {token} {min_score:.4f} {num_participants} {num_qualifiers}")
+
+                template += f"_{token.upper()}_\n"
+                template += f"Minimum score: `{min_score:.4f} {token}`\n"
+                template += f"Number of participants: `{num_participants}`\n"
+                template += f"Number of qualifiers: `{num_qualifiers}`\n"
+
+                if i == len(CAMPAIGNS["campaign_2"]["tokens"]) - 1:
+                    template += "\n"
+
+        template += (
+            "\n\n"
+            "🚨 Note that the results showed by this bot **is consider not a final decision** \!\n"
+            "❗️ **The final decision will be made by the Connext team after sybil filtering was applied\!**")
 
         with open(bot.log_path, "a") as fp:
             fp.write(f"{curr_time},min_score\n")

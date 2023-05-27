@@ -1,6 +1,7 @@
 import itertools
 import os
 import time
+from datetime import datetime, timedelta
 from typing import Any, List, Optional
 Bot = Any
 
@@ -195,43 +196,37 @@ def format_campaign2s_results(wallet: str, results: dict) -> str:
     results = results["results"]
 
     if results["is_qualified"]:
-        template += f"\n🥳 You are qualified for special NFT\n"
+        template += f"\n🥳 You are a potential candidate for special NFT\n"
     else:
         template += f"\n🫣 You are not qualified for special NFT\n"
-        template += f"    ⏩ Reason: {results['reason']}"
+        template += f"    ⏩ Reason: {results['reason']}\n\n"
+
+    template += "🚨 Note that the results showed by this bot **is consider not a final decision!\n"
+    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied!"
     return template
 
 
 def format_results(wallet: str, results: dict) -> str:
     template = f"Wallet address: {wallet}\n"
 
-    if "filters" in results and len(results["filters"]) > 0:
-        template += f"\n🔫 Applied filters:\n"
-        for _token, _min_value in results["filters"].items():
-            if _token == Token.CWETHLP:
-                template += f"    ⏩ {_min_value:.6f} {_token}\n"
-            else:
-                template += f"    ⏩ {_min_value:.2f} {_token}\n"
+    # if "filters" in results and len(results["filters"]) > 0:
+    #     template += f"\n🔫 Applied filters:\n"
+    #     for _token, _min_value in results["filters"].items():
+    #         if _token == Token.CWETHLP:
+    #             template += f"    ⏩ {_min_value:.6f} {_token}\n"
+    #         else:
+    #             template += f"    ⏩ {_min_value:.2f} {_token}\n"
 
     chain_qualified = []
     for k, v in results["results"].items():
-        if "LP" not in k:
-            chain = k
+        items = k.split("_")
+        token = items[-1]
+        chain = " ".join(items[:-1])
 
-            if v["is_qualified"]:
-                template += f"\n🥳 You are qualified for {chain}\n"
-            else:
-                template += f"\n🫣 You are not qualified for {chain}\n"
-            token = None
+        if v["is_qualified"]:
+            template += f"\n🥳 You are on a potential top 30% (pre-filtering) for {token} on {chain}\n"
         else:
-            items = k.split("_")
-            token = items[-1]
-            chain = " ".join(items[:-1])
-
-            if v["is_qualified"]:
-                template += f"\n🥳 You are qualified for {token} on {chain}\n"
-            else:
-                template += f"\n🫣 You are not qualified for {token} on {chain}\n"
+            template += f"\n🫣 You are not qualified for {token} on {chain}\n"
 
         rank = v["rank"]
         score = v["score"]
@@ -258,7 +253,10 @@ def format_results(wallet: str, results: dict) -> str:
             chain_qualified.append(chain)
 
     template += f"\n⚡️ You've qualified {len(chain_qualified)} chains!\n"
-    template += f"{chain_qualified}"
+    template += f"{chain_qualified}\n\n"
+
+    template += "🚨 Note that the results showed by this bot **is consider not a final decision!\n"
+    template += "❗️ The final decision will be made by the Connext team after sybil filtering was applied!"
     return template
 
 
@@ -299,6 +297,17 @@ def query_campaign1(
             "score", 
             ascending=False
         ).reset_index(drop=True)
+
+        # apply default filter
+        min_filter = 0.75 if token == Token.CUSDCLP else 0.00075
+        _score = _score[_score["score"] > min_filter]
+
+        # remove address provide lower than 30 days
+        holding_minutes = _score["minutes_qualified"].values
+        if datetime.now().timestamp() >= CAMPAIGNS[campaign_name]["end"].timestamp():
+            print("30 days reached, filtering out addresses with less than 30 days")
+            _score = _score[holding_minutes >= timedelta(days=30).total_seconds() / 60]
+
         qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
         min_score = qualified["score"].values[-1]
         user_results = qualified[qualified["user_address"] == query]
@@ -334,8 +343,8 @@ def query_campaign2(
     query: str,
     user_scores: pd.DataFrame,
     chains: List[Chain],
-    min_token1_value: float = 0,
-    min_token2_value: float = 0,
+    min_token1_value: float = 1e-7,
+    min_token2_value: float = 1e-7,
     threshold: float = 0.3,
 ):
     campaign_name = "campaign_2"
@@ -357,15 +366,32 @@ def query_campaign2(
     results["filters"] = filters
     
     query_results = {}
-    for chain in chains:
-        min_value = min_token1_value + min_token2_value
+    for chain, token in itertools.product(chains, [token1, token2]):
+        min_value = min_token1_value if token == token1 else min_token2_value
         chain = Chain.resolve_connext_domain(chain)
         _score = user_scores[
-            (user_scores["chain"] == chain)
+            (user_scores["chain"] == chain) & \
+            (user_scores["token"] == token)
         ].sort_values(
             "score", 
             ascending=False
         ).reset_index(drop=True)
+
+        # apply default filter
+        min_filter = 1.  # min value of $1 for both tokens
+        _score = _score[_score["score"] > min_filter]
+
+        # remove address provide lower than 30 days
+        holding_minutes = _score["minutes_qualified"].values
+        # if today is after the campaign end date - 30 days
+        if datetime.now().timestamp() >= (CAMPAIGNS[campaign_name]["end"] - timedelta(days=30)).timestamp():
+            print("campaign took less than 30 days, filtering out addresses with less than 30 days")
+            # this value converge to 1 as the campaign reaches the end
+            desired_minutes = min(
+                (datetime.now() - (CAMPAIGNS[campaign_name]["end"] - timedelta(days=30))).total_seconds() / 60,
+                timedelta(days=30).total_seconds() / 60
+            )
+            _score = _score[holding_minutes >= desired_minutes]
 
         qualified = _score.iloc[:round(len(_score[_score["score"] > min_value]) * threshold)]
         min_score = qualified["score"].values[-1]
@@ -374,8 +400,7 @@ def query_campaign2(
         
         if len(user_results) > 0:
             # qualified
-            print_log(f"[campaign2] {query}<>{chain} :: qualified")
-            query_results[chain] = {
+            query_results[f"{chain}_{token}"] = {
                 "rank": user_results.index[0],
                 "score": user_results["score"].values[0],
                 "qualified": len(qualified),
@@ -384,10 +409,9 @@ def query_campaign2(
                 "is_qualified": True
             }
         elif query in _score["user_address"].values:
-            print_log(f"[campaign2] {query}<>{chain} :: not qualified")
             # not qualified
             user_results = _score[_score["user_address"] == query]
-            query_results[chain] = {
+            query_results[f"{chain}_{token}"] = {
                 "rank": user_results.index[0],
                 "score": user_results["score"].values[0],
                 "qualified": len(qualified),
@@ -395,8 +419,6 @@ def query_campaign2(
                 "min_score": min_score,
                 "is_qualified": False
             }
-        else:
-            print_log(f"[campaign2] {query}<>{chain} :: not participated")
 
     results["results"] = query_results
     return results
@@ -500,8 +522,8 @@ def query_user(
     campaign_name: str,
     bot: Bot,
     chains: List[Chain],
-    min_token1_value: float = 0, 
-    min_token2_value: float = 0,
+    min_token1_value: float = 1e-7, 
+    min_token2_value: float = 1e-7,
     threshold: float = 0.3
 ) -> None:
     # initialize results

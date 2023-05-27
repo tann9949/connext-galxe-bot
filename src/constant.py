@@ -15,9 +15,27 @@ class Chain:
     BNB_CHAIN = 6450786
     GNOSIS = 6778479
     POLYGON = 1886350457
+    
+    @staticmethod
+    def resolve_chain_name(chain: str) -> Chain:
+        if chain == "optimism":
+            return Chain.OPTIMISM
+        elif chain == "arbitrum_one":
+            return Chain.ARBITRUM_ONE
+        elif chain == "bnb_chain":
+            return Chain.BNB_CHAIN
+        elif chain == "gnosis":
+            return Chain.GNOSIS
+        elif chain == "polygon":
+            return Chain.POLYGON
+        elif chain == "ethereum":
+            return Chain.ETHEREUM
+        else:
+            raise Exception(f"Chain {chain} not supported")
+        
         
     @staticmethod
-    def resolve_connext_domain(domain_id: int) -> Chain:
+    def resolve_connext_domain(domain_id: int) -> str:
         if isinstance(domain_id, str):
             domain_id = int(domain_id)
         if domain_id == Chain.ETHEREUM:
@@ -33,7 +51,7 @@ class Chain:
         elif domain_id == Chain.POLYGON:
             return "polygon"
         else:
-            raise Exception("Domain {domain_id} not supported")
+            raise Exception(f"Domain {domain_id} not supported")
 
 
 class DiamondContract:

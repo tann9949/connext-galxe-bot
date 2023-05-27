@@ -16,7 +16,7 @@ class SmartContract(object):
         Chain.OPTIMISM: "https://endpoints.omniatech.io/v1/op/mainnet/public",
         Chain.ARBITRUM_ONE: "https://endpoints.omniatech.io/v1/arbitrum/one/public",
         Chain.BNB_CHAIN: "https://bsc-dataseed3.binance.org",
-        Chain.GNOSIS: "https://gnosis-mainnet.public.blastapi.io",
+        Chain.GNOSIS: "https://rpc.ankr.com/gnosis",
         Chain.POLYGON: "https://polygon-bor.publicnode.com",
     }
     

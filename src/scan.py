@@ -12,6 +12,9 @@ from .contract import ConnextDiamond
 from .utils import print_log
 
 
+class WindowTooLargeException(Exception):
+    pass
+
 class ScanTxn(object):
 
     def __init__(
@@ -210,6 +213,11 @@ class ScanAPI(object):
                 else:
                     raise ConnectionError(f"Request failed with status code {response.status_code}")
             except (ConnectionError, requests.exceptions.ReadTimeout) as e:
+                # skip case where window is too large
+                print(str(e))
+                if "window is too large" in str(e):
+                    raise WindowTooLargeException(str(e))
+
                 # check if we have reached max attempt
                 print_log(f"[+] Failed to fetch {self.scan_name} API [{attempt}/{max_attempt}], retrying...")
                 print_log(f"[-] Error Message: {e}")
