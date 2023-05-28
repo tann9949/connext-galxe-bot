@@ -126,6 +126,11 @@ def main() -> None:
         print_log(f"dataset loaded in {time.time() - st:.2f} seconds")
 
         for campaign_name, campaign in CAMPAIGNS.items():
+            # if campaign already ended, skip
+            if campaign["end"] < datetime.now():
+                print_log(f"{campaign_name} already ended, skip caching...")
+                continue
+
             print_log(f"processing {campaign_name}...")
             checkpoint_dates = get_checkpoint_dates(
                 campaign_name=campaign_name, 
